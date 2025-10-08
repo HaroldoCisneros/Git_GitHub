@@ -335,6 +335,7 @@ body.overflow-hidden {
   width: 100%;
   max-width: 100rem;
   margin: 0 auto;
+  background-color: blue;
 }
 
 .contenedor-principal {
