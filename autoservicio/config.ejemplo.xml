@@ -3,7 +3,8 @@
   Archivo de configuración de la Aplicación de Autoservicio.
 
   Es el mismo formato del config.xml del Visor de Precios, con secciones
-  nuevas al final: <caja>, <usuario>, <ambiente> y <seguridad>.
+  nuevas al final: <usuario>, <ambiente> y <seguridad>.
+  La caja NO va aquí: se toma del ambiente del usuario (PPV_AMBIENTE.VD_CAJA).
 
   Para usarlo: copie este archivo como "config.xml" en la MISMA CARPETA del
   ejecutable (o de main.py) y coloque los datos reales. El config.xml real
@@ -41,11 +42,6 @@
   </pantalla>
 
   <!-- ===== NUEVO: solo para el Autoservicio ===== -->
-  <caja>
-    <!-- Código de esta caja. Debe existir en la tabla "cajas" de Profit -->
-    <codigo>01</codigo>
-  </caja>
-
   <usuario>
     <!-- Usuario y clave de Profit con los que trabaja esta caja. No se piden en
          pantalla: se validan al arrancar contra MasterProfit.dbo.employee
@@ -59,13 +55,12 @@
   </usuario>
 
   <ambiente>
-    <!-- El usuario debe tener una fila en PPV_AMBIENTE (COD_EMP + COD_USU).
-         Si no la tiene, la aplicación muestra el error y no entra.
-         Ambas etiquetas son opcionales:
-           cod_emp = valor de COD_EMP (por defecto el de <basedatos>, ej. PRADO_25)
-           base    = base donde está PPV_AMBIENTE (por defecto la de la empresa) -->
+    <!-- El usuario debe tener una fila en PPV_AMBIENTE (COD_EMP + COD_USU), en la
+         base de datos de la empresa. Si no la tiene, la aplicación muestra el
+         error y no entra. Del ambiente salen, entre otros: la caja (VD_CAJA),
+         la lista de precios (VD_LISTPREC) y el cliente por defecto (VD_CLIENTE).
+         Opcional: cod_emp = valor de COD_EMP (por defecto el de <basedatos>). -->
     <cod_emp></cod_emp>
-    <base></base>
   </ambiente>
 
   <seguridad>

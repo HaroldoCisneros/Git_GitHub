@@ -4,16 +4,18 @@ Controlador general de la aplicación.
 Coordina el arranque:
 
     1. Lee el config.xml.
-    2. Se conecta a SQL Server y valida que la caja del XML exista en Profit.
-    3. Valida el usuario y la clave del XML contra MasterProfit.dbo.employee
+    2. Valida el usuario y la clave del XML contra MasterProfit.dbo.employee
        (no se piden en pantalla).
-    4. Carga el ambiente del usuario (tabla PPV_AMBIENTE) con todos sus
+    3. Carga el ambiente del usuario (tabla PPV_AMBIENTE) con todos sus
        parámetros.
-    5. Abre la pantalla principal (escaneo / factura).
+    4. Valida que la caja del ambiente (VD_CAJA) exista en la tabla cajas.
+    5. Valida la lista de precios del ambiente (VD_LISTPREC).
+    6. Abre la pantalla principal (escaneo / factura).
 
-Si algo falla al arrancar (falta el XML, no hay conexión, la caja no existe,
-el usuario o la clave no son correctos, el usuario no tiene ambiente) se
-muestra el error en pantalla y la aplicación termina sin entrar.
+Si algo falla al arrancar (falta el XML, no hay conexión, el usuario o la
+clave no son correctos, el usuario no tiene ambiente, la caja o la lista de
+precios del ambiente no son válidas) se muestra el error en pantalla y la
+aplicación termina sin entrar.
 """
 
 from __future__ import annotations
@@ -29,6 +31,8 @@ from .configuracion import Configuracion, ErrorConfiguracion, cargar_configuraci
 from .modelos import Sesion
 from .repositorios import (RepositorioAmbiente, RepositorioArticulos, RepositorioCajas,
                            RepositorioClientes, RepositorioUsuarios)
+from .repositorios.ambiente import TABLA_AMBIENTE
+from .repositorios.articulos import ErrorListaPrecios
 from .repositorios.usuarios import ErrorUsuario
 from .ui.dialogos import mostrar_mensaje
 from .ui.estilos import HOJA_ESTILOS
@@ -75,39 +79,42 @@ class Aplicacion:
 
         self.bd = BaseDatos(self.config.sql)
         try:
-            # 2. La caja debe existir en Profit.
-            caja = RepositorioCajas(self.bd).obtener(self.config.caja.codigo)
-            if caja is None:
-                return self._error_fatal(
-                    "Caja no válida",
-                    f"La caja '{self.config.caja.codigo}' indicada en config.xml "
-                    "no existe en Profit.")
-            log.info("Caja validada: %s - %s", caja.codigo, caja.descripcion)
-
-            # 3. Usuario y clave del XML contra la tabla employee.
+            # 2. Usuario y clave del XML contra la tabla employee.
             usuario = RepositorioUsuarios(self.bd, self.config.usuario).validar()
 
-            # 4. El usuario debe tener un ambiente creado en PPV_AMBIENTE.
-            repo_ambiente = RepositorioAmbiente(self.bd, self.config.ambiente)
-            ambiente = repo_ambiente.obtener(usuario.codigo)
+            # 3. El usuario debe tener un ambiente creado en PPV_AMBIENTE.
+            ambiente = RepositorioAmbiente(self.bd, self.config.ambiente).obtener(usuario.codigo)
             if ambiente is None:
                 return self._error_fatal(
                     "Usuario sin ambiente",
                     f"El usuario '{usuario.codigo}' no tiene un ambiente creado para la "
-                    f"empresa '{self.config.ambiente.cod_emp}' "
-                    f"(tabla {repo_ambiente.nombre_tabla()}).")
+                    f"empresa '{self.config.ambiente.cod_emp}' (tabla {TABLA_AMBIENTE}).")
+
+            # 4. La caja sale del ambiente (VD_CAJA) y debe existir en Profit.
+            codigo_caja = ambiente.caja or ""
+            caja = RepositorioCajas(self.bd).obtener(codigo_caja) if codigo_caja else None
+            if caja is None:
+                return self._error_fatal(
+                    "Caja no válida",
+                    f"La caja del ambiente del usuario '{usuario.codigo}' "
+                    f"(VD_CAJA = '{codigo_caja}') no existe en Profit.")
+            log.info("Caja validada: %s - %s", caja.codigo, caja.descripcion)
+
+            # 5. Lista de precios del ambiente (VD_LISTPREC).
+            repo_articulos = RepositorioArticulos(self.bd, ambiente.lista_precios)
 
         except ErrorBaseDatos as error:
             return self._error_fatal("Error de conexión", str(error))
         except ErrorUsuario as error:
             return self._error_fatal("Usuario no válido", str(error))
+        except ErrorListaPrecios as error:
+            return self._error_fatal("Lista de precios no válida", str(error))
 
         self.sesion = Sesion(caja=caja, usuario=usuario, ambiente=ambiente)
 
-        # 5. Pantalla principal.
+        # 6. Pantalla principal.
         self._ventana_principal = VentanaPrincipal(
-            self.config, self.sesion,
-            RepositorioClientes(self.bd), RepositorioArticulos(self.bd))
+            self.config, self.sesion, RepositorioClientes(self.bd), repo_articulos)
         self._ventana_principal.mostrar(self._pantalla_completa)
         return True
 

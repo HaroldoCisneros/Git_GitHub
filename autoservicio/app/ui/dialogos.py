@@ -5,7 +5,8 @@ Los cuadros de diálogo estándar de Qt (QMessageBox, QInputDialog) tienen
 botones pequeños y no muestran teclado, así que no sirven en una pantalla
 táctil. Aquí están las versiones propias de la aplicación:
 
-    pedir_texto(...)      Pide un dato mostrando el teclado en pantalla.
+    pedir_texto(...)      Pide un dato mostrando el teclado en pantalla
+                          (opcionalmente con un botón extra, ver OPCION_EXTRA).
     mostrar_mensaje(...)  Muestra un aviso o un error con un botón grande.
     confirmar(...)        Pregunta Sí / No con botones grandes.
 
@@ -21,6 +22,13 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit, QPushBut
                                QVBoxLayout, QWidget)
 
 from .teclado import MODO_ALFANUMERICO, MODO_NUMERICO, TecladoVirtual
+
+# Valor que devuelve pedir_texto() cuando se toca el botón extra
+# (por ejemplo "Usar cliente por defecto" en la pantalla de la cédula).
+OPCION_EXTRA = object()
+
+# Código de resultado del diálogo para el botón extra (Accepted = 1, Rejected = 0).
+_RESULTADO_EXTRA = 2
 
 # Anchos de los diálogos según el tipo de teclado (px).
 ANCHO_DIALOGO_NUMERICO = 560
@@ -56,7 +64,8 @@ class DialogoEntrada(_DialogoBase):
 
     def __init__(self, parent: Optional[QWidget], titulo: str, mensaje: str = "",
                  modo: str = MODO_NUMERICO, oculto: bool = False,
-                 permitir_cancelar: bool = True, texto_inicial: str = ""):
+                 permitir_cancelar: bool = True, texto_inicial: str = "",
+                 boton_extra: Optional[str] = None):
         """
         :param titulo: texto grande de arriba.
         :param mensaje: explicación debajo del título.
@@ -64,6 +73,8 @@ class DialogoEntrada(_DialogoBase):
         :param oculto: True para contraseñas (muestra puntos en vez de números).
         :param permitir_cancelar: si es False no aparece el botón Cancelar.
         :param texto_inicial: valor con el que arranca el campo.
+        :param boton_extra: texto de un botón adicional (opcional). Al tocarlo
+            el diálogo se cierra y pedir_texto() devuelve OPCION_EXTRA.
         """
         super().__init__(parent)
 
@@ -99,6 +110,13 @@ class DialogoEntrada(_DialogoBase):
         self.teclado.aceptado.connect(self._aceptar)
         layout.addWidget(self.teclado)
 
+        # --- Botón extra (opcional) ---
+        if boton_extra:
+            extra = QPushButton(boton_extra)
+            extra.setFocusPolicy(Qt.NoFocus)
+            extra.clicked.connect(lambda: self.done(_RESULTADO_EXTRA))
+            layout.addWidget(extra)
+
         # --- Botón cancelar ---
         if permitir_cancelar:
             cancelar = QPushButton("Cancelar")
@@ -123,15 +141,20 @@ class DialogoEntrada(_DialogoBase):
 
 def pedir_texto(parent: Optional[QWidget], titulo: str, mensaje: str = "",
                 modo: str = MODO_NUMERICO, oculto: bool = False,
-                permitir_cancelar: bool = True, texto_inicial: str = "") -> Optional[str]:
+                permitir_cancelar: bool = True, texto_inicial: str = "",
+                boton_extra: Optional[str] = None):
     """
     Muestra un DialogoEntrada y espera la respuesta.
 
-    :return: el texto escrito, o None si el usuario tocó Cancelar.
+    :return: el texto escrito; None si el usuario tocó Cancelar; u
+        OPCION_EXTRA si tocó el botón extra.
     """
     dialogo = DialogoEntrada(parent, titulo, mensaje, modo, oculto,
-                             permitir_cancelar, texto_inicial)
-    if dialogo.exec() == QDialog.Accepted:
+                             permitir_cancelar, texto_inicial, boton_extra)
+    resultado = dialogo.exec()
+    if resultado == _RESULTADO_EXTRA:
+        return OPCION_EXTRA
+    if resultado == QDialog.Accepted:
         return dialogo.valor()
     return None
 
@@ -199,5 +222,5 @@ def confirmar(parent: Optional[QWidget], titulo: str, texto: str,
 
 # Se reexportan las constantes de modo para que las pantallas no tengan que
 # importar el módulo del teclado.
-__all__ = ["pedir_texto", "mostrar_mensaje", "confirmar", "DialogoEntrada",
+__all__ = ["pedir_texto", "OPCION_EXTRA", "mostrar_mensaje", "confirmar", "DialogoEntrada",
            "DialogoMensaje", "MODO_NUMERICO", "MODO_ALFANUMERICO"]

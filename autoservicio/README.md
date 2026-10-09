@@ -14,6 +14,7 @@ python main.py --ventana               # en ventana, para pruebas
 
 Requisitos en la caja: Python 3.9+ y el driver **ODBC Driver 17 for SQL Server**.
 El usuario de SQL del XML necesita leer las tablas de la empresa (incluida `PPV_AMBIENTE`) y `MasterProfit.dbo.employee`.
+La caja ya no va en el XML: sale del ambiente del usuario.
 
 ## Configuración (`config.xml`)
 
@@ -22,20 +23,23 @@ Precios con estas secciones nuevas:
 
 | Sección | Etiqueta | Uso |
 |---|---|---|
-| `<caja>` | `<codigo>` | Código de la caja; se valida contra la tabla `cajas` de Profit. **Obligatorio.** |
 | `<usuario>` | `<codigo>`, `<clave>` | Usuario y clave de Profit. Se validan al arrancar contra `MasterProfit.dbo.employee` (activo, Estado `A`, encriptación de Profit). **Obligatorio.** |
 | `<usuario>` | `<base>`, `<tabla>` | Opcionales. Por defecto `MasterProfit` / `employee`. |
-| `<ambiente>` | `<cod_emp>`, `<base>` | Opcionales. `COD_EMP` de `PPV_AMBIENTE` (por defecto `<basedatos>`) y base donde está la tabla (por defecto la de la empresa). |
+| `<ambiente>` | `<cod_emp>` | Opcional. `COD_EMP` de `PPV_AMBIENTE` (por defecto `<basedatos>`). |
 | `<seguridad>` | `<clave_salida>` | Contraseña para salir. Si no se indica: `9898989898`. |
 
 ## Flujo
 
-1. Arranca, lee `config.xml` y valida la caja en Profit.
+1. Arranca y lee `config.xml`.
 2. Valida el usuario y la clave del XML (no se piden en pantalla). Si no son
    correctos muestra el error y no entra.
 3. Carga el ambiente del usuario de `PPV_AMBIENTE` (`COD_EMP` + `COD_USU`) con
    **todos** sus parámetros. Si no tiene ambiente creado, muestra el error y no entra.
-4. Pantalla principal: factura nueva → pide la cédula del cliente.
+   Del ambiente salen la **caja** (`VD_CAJA`, se valida en `cajas`), la **lista de
+   precios** (`VD_LISTPREC`, 1 a 5 → `prec_vta1`…`prec_vta5`) y el **cliente por
+   defecto** (`VD_CLIENTE`).
+4. Pantalla principal: factura nueva → pide la cédula del cliente. Hay un botón
+   para continuar sin cédula con el cliente por defecto del ambiente.
 5. Se escanean los artículos (lector en modo teclado, termina con Enter).
 6. **Salir** pide la contraseña de salida.
 
@@ -70,7 +74,5 @@ tests/                       Pruebas: python -m unittest discover tests
 
 ## Pendientes
 
-- **Confirmar campos de Profit**: `cajas` (`cod_caja`, `descrip`), lista de precios en `art` (hoy `prec_vta1`; ¿usar `VD_LISTPREC` del ambiente?), % de IVA según `tipo_imp`.
-- **Confirmar** que `COD_EMP` de `PPV_AMBIENTE` es el nombre de la base de la empresa y en qué base está la tabla.
-- **Cliente no registrado**: crear, usar genérico o rechazar (hoy se rechaza).
+- **Confirmar campos de Profit**: `cajas` (`cod_caja`, `descrip`), formato de `VD_LISTPREC`, % de IVA según `tipo_imp`.
 - **Grabar la factura en Profit** (botón "Finalizar compra").

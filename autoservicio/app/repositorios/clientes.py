@@ -8,8 +8,9 @@ En Profit la cédula puede estar guardada de varias formas ("V-12345678",
 (co_cli). Por eso se le quitan guiones, puntos y espacios y se comparan las
 variantes con y sin la letra.
 
-PENDIENTE DE CONFIRMAR: qué hacer si la cédula no existe (crear el cliente,
-usar un cliente genérico o rechazar). Por ahora se rechaza.
+Si la cédula no está registrada, el cliente puede tocar el botón de
+"cliente por defecto": se usa el cliente VD_CLIENTE del ambiente, que se
+busca por su código con ``buscar_por_codigo``.
 """
 
 from __future__ import annotations
@@ -33,6 +34,15 @@ SQL_CLIENTE_POR_CEDULA = f"""
         OR {_LIMPIAR.format(campo="co_cli")} IN (?, ?, ?)
 """
 
+# Busca un cliente por su código (co_cli).
+SQL_CLIENTE_POR_CODIGO = """
+    SELECT RTRIM(co_cli)  AS codigo,
+           RTRIM(cli_des) AS nombre,
+           RTRIM(rif)     AS rif
+      FROM clientes
+     WHERE co_cli = ?
+"""
+
 
 class RepositorioClientes:
     """Consultas sobre la tabla de clientes."""
@@ -54,6 +64,20 @@ class RepositorioClientes:
         # Variantes: solo número, con V (venezolano) y con E (extranjero).
         variantes = (numero, "V" + numero, "E" + numero)
         fila = self._bd.consultar_uno(SQL_CLIENTE_POR_CEDULA, variantes + variantes)
+        if fila is None:
+            return None
+        return Cliente(codigo=fila["codigo"], nombre=fila["nombre"] or "", rif=fila["rif"] or "")
+
+    def buscar_por_codigo(self, codigo: str) -> Optional[Cliente]:
+        """
+        Busca un cliente por su código (se usa para el cliente por defecto del ambiente).
+
+        :return: el Cliente, o None si el código no existe.
+        """
+        codigo = (codigo or "").strip()
+        if not codigo:
+            return None
+        fila = self._bd.consultar_uno(SQL_CLIENTE_POR_CODIGO, (codigo,))
         if fila is None:
             return None
         return Cliente(codigo=fila["codigo"], nombre=fila["nombre"] or "", rif=fila["rif"] or "")

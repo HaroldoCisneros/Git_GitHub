@@ -2,11 +2,8 @@
 Lectura del archivo de configuración config.xml.
 
 El archivo tiene el MISMO formato que el del Visor de Precios (secciones
-<sqlserver>, <rutas> y <pantalla>) y además tres secciones nuevas:
+<sqlserver>, <rutas> y <pantalla>) y además estas secciones nuevas:
 
-    <caja>
-        <codigo>01</codigo>            Código de la caja en la tabla "cajas" de Profit.
-    </caja>
     <usuario>
         <codigo>...</codigo>           Usuario de Profit (tabla employee).
         <clave>...</clave>             Su clave de Profit.
@@ -15,8 +12,9 @@ El archivo tiene el MISMO formato que el del Visor de Precios (secciones
     </usuario>
     <ambiente>                         (sección opcional)
         <cod_emp>...</cod_emp>         Empresa en PPV_AMBIENTE (por defecto, <basedatos>).
-        <base>...</base>               Base donde está PPV_AMBIENTE (por defecto, la de la empresa).
     </ambiente>
+
+La caja ya NO va en el XML: se toma del ambiente del usuario (VD_CAJA).
     <seguridad>
         <clave_salida>...</clave_salida>   Contraseña para salir de la aplicación.
     </seguridad>
@@ -96,12 +94,6 @@ class ConfigPantalla:
 
 
 @dataclass
-class ConfigCaja:
-    """Datos de la caja (sección nueva <caja>)."""
-    codigo: str
-
-
-@dataclass
 class ConfigUsuario:
     """
     Usuario con el que trabaja la caja (sección nueva <usuario>).
@@ -119,9 +111,9 @@ class ConfigAmbiente:
     Dónde buscar el ambiente del usuario (sección nueva y opcional <ambiente>).
 
     El ambiente es la fila de PPV_AMBIENTE con la llave COD_EMP + COD_USU.
+    La tabla está en la base de datos de la empresa (la de <sqlserver><basedatos>).
     """
     cod_emp: str          # Valor de COD_EMP. Por defecto el nombre de la base de la empresa.
-    base: str = ""        # Vacío = la base de la empresa (la de <sqlserver><basedatos>).
 
 
 @dataclass
@@ -136,7 +128,6 @@ class Configuracion:
     sql: ConfigSQL
     rutas: ConfigRutas
     pantalla: ConfigPantalla
-    caja: ConfigCaja
     usuario: ConfigUsuario
     ambiente: ConfigAmbiente
     seguridad: ConfigSeguridad = field(default_factory=ConfigSeguridad)
@@ -180,8 +171,6 @@ def _obligatorio(nodo: ET.Element | None, seccion: str, etiqueta: str) -> str:
 def _nombre_sql(nodo: ET.Element | None, seccion: str, etiqueta: str, defecto: str) -> str:
     """Lee un nombre de base o tabla y comprueba que sea seguro ponerlo dentro del SQL."""
     valor = _texto(nodo, etiqueta, defecto) or defecto
-    if not valor:
-        return ""          # Opcional y sin valor: se usa la base de la conexión.
     if not PATRON_NOMBRE_SQL.match(valor):
         raise ErrorConfiguracion(
             f"<{seccion}><{etiqueta}> solo puede tener letras, números y _ : '{valor}'")
@@ -240,9 +229,6 @@ def cargar_configuracion(ruta: str | None = None) -> Configuracion:
         nombre_negocio=_texto(nodo_pantalla, "nombre_negocio"),
     )
 
-    # --- <caja> (nuevo, obligatorio) ----------------------------------------
-    caja = ConfigCaja(codigo=_obligatorio(raiz.find("caja"), "caja", "codigo"))
-
     # --- <usuario> (nuevo, obligatorio) -------------------------------------
     nodo_usuario = raiz.find("usuario")
     usuario = ConfigUsuario(
@@ -254,11 +240,7 @@ def cargar_configuracion(ruta: str | None = None) -> Configuracion:
     )
 
     # --- <ambiente> (nuevo, opcional) ---------------------------------------
-    nodo_ambiente = raiz.find("ambiente")
-    ambiente = ConfigAmbiente(
-        cod_emp=_texto(nodo_ambiente, "cod_emp") or sql.basedatos,
-        base=_nombre_sql(nodo_ambiente, "ambiente", "base", ""),
-    )
+    ambiente = ConfigAmbiente(cod_emp=_texto(raiz.find("ambiente"), "cod_emp") or sql.basedatos)
 
     # --- <seguridad> (nuevo, opcional) --------------------------------------
     seguridad = ConfigSeguridad(
@@ -266,5 +248,5 @@ def cargar_configuracion(ruta: str | None = None) -> Configuracion:
     )
 
     return Configuracion(sql=sql, rutas=rutas, pantalla=pantalla,
-                         caja=caja, usuario=usuario, ambiente=ambiente,
+                         usuario=usuario, ambiente=ambiente,
                          seguridad=seguridad, archivo=ruta)

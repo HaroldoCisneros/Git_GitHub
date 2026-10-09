@@ -4,6 +4,8 @@ Pantalla principal: escaneo de artículos.
 Flujo de la pantalla:
     1. Al abrir (y cada vez que se termina o cancela una factura) se crea una
        factura NUEVA y se pide la cédula del cliente con el teclado numérico.
+       En esa misma pantalla hay un botón para hacer la factura con el
+       cliente por defecto del ambiente (VD_CLIENTE).
     2. Con el cliente identificado, el lector de códigos de barras escribe
        el código en el campo de escaneo y manda "Enter"; el artículo se busca
        en Profit y se agrega a la tabla.
@@ -37,8 +39,8 @@ from ..configuracion import Configuracion
 from ..modelos import Factura, Sesion
 from ..repositorios import RepositorioArticulos, RepositorioClientes
 from ..utilidades import formatear_monto
-from .dialogos import (MODO_ALFANUMERICO, MODO_NUMERICO, confirmar, mostrar_mensaje,
-                       pedir_texto)
+from .dialogos import (MODO_ALFANUMERICO, MODO_NUMERICO, OPCION_EXTRA, confirmar,
+                       mostrar_mensaje, pedir_texto)
 from .ventana_kiosco import VentanaKiosco
 
 log = logging.getLogger("autoservicio.principal")
@@ -49,6 +51,9 @@ COL_CODIGO, COL_DESCRIPCION, COL_CANTIDAD, COL_PRECIO, COL_TOTAL = range(len(COL
 
 # Alto de cada renglón de la tabla (grande para tocarlo con el dedo).
 ALTO_RENGLON = 56
+# Texto del botón para facturar con el cliente por defecto del ambiente.
+TEXTO_CLIENTE_DEFECTO = "Continuar sin cédula (cliente por defecto)"
+
 # Alto del logo en la barra superior.
 ALTO_LOGO = 70
 
@@ -242,27 +247,45 @@ class VentanaPrincipal(VentanaKiosco):
     def _pedir_cliente(self) -> None:
         """
         Pide la cédula con el teclado numérico y busca al cliente en Profit.
-        Si no existe, lo informa y vuelve a preguntar. Si se toca Cancelar,
-        la factura queda sin cliente (no se podrá escanear hasta indicarlo).
+
+        - Si la cédula no existe, lo informa y vuelve a preguntar.
+        - El botón "cliente por defecto" usa el VD_CLIENTE del ambiente
+          (solo aparece si el ambiente tiene uno configurado).
+        - Si se toca Cancelar, la factura queda sin cliente (no se podrá
+          escanear hasta indicarlo).
         """
+        codigo_defecto = self._sesion.ambiente.cliente or ""
         while True:
             cedula = pedir_texto(self, "Bienvenido",
                                  "Introduzca su número de cédula para comenzar",
-                                 modo=MODO_NUMERICO)
+                                 modo=MODO_NUMERICO,
+                                 boton_extra=TEXTO_CLIENTE_DEFECTO if codigo_defecto else None)
             if cedula is None:          # Canceló.
                 break
 
             try:
-                cliente = self._repo_clientes.buscar_por_cedula(cedula)
+                if cedula is OPCION_EXTRA:
+                    cliente = self._repo_clientes.buscar_por_codigo(codigo_defecto)
+                else:
+                    cliente = self._repo_clientes.buscar_por_cedula(cedula)
             except ErrorBaseDatos as error:
                 mostrar_mensaje(self, "Error", str(error), es_error=True)
                 break
 
+            if cliente is None and cedula is OPCION_EXTRA:
+                # El ambiente apunta a un cliente que no existe: error de configuración.
+                log.error("El cliente por defecto VD_CLIENTE=%s no existe", codigo_defecto)
+                mostrar_mensaje(self, "Cliente por defecto no válido",
+                                f"El cliente por defecto del ambiente ({codigo_defecto}) "
+                                "no existe en Profit. Avise al personal de la tienda.",
+                                es_error=True)
+                continue
+
             if cliente is None:
-                # PENDIENTE: definir si se crea el cliente o se usa uno genérico.
+                sugerencia = (f"Verifique el número o toque \"{TEXTO_CLIENTE_DEFECTO}\"."
+                              if codigo_defecto else "Verifique el número.")
                 mostrar_mensaje(self, "Cliente no registrado",
-                                f"No se encontró la cédula {cedula}.\n"
-                                "Verifique el número o diríjase a una caja atendida.",
+                                f"No se encontró la cédula {cedula}.\n{sugerencia}",
                                 es_error=True)
                 continue
 

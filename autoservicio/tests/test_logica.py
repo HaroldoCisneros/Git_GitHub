@@ -22,6 +22,9 @@ from app.encriptacion_profit import (clave_coincide, encriptar,  # noqa: E402
 from app.modelos import Articulo, Caja, Factura, Usuario  # noqa: E402
 from app.modelos import Ambiente  # noqa: E402
 from app.repositorios.ambiente import RepositorioAmbiente  # noqa: E402
+from app.repositorios.articulos import (ErrorListaPrecios, RepositorioArticulos,  # noqa: E402
+                                        columna_precio)
+from app.repositorios.clientes import RepositorioClientes  # noqa: E402
 from app.repositorios.usuarios import ErrorUsuario, RepositorioUsuarios  # noqa: E402
 from app.utilidades import formatear_monto, solo_digitos  # noqa: E402
 
@@ -44,18 +47,17 @@ class PruebaConfiguracion(unittest.TestCase):
         self.assertEqual(config.sql.basedatos, "PRADO_25")
         self.assertFalse(config.sql.usa_autenticacion_windows)
         self.assertEqual(config.pantalla.segundos_producto, 20)
-        self.assertEqual(config.caja.codigo, "01")
         self.assertEqual(config.seguridad.clave_salida, "9898989898")
         self.assertEqual(config.usuario.codigo, "CAJA01")
         self.assertEqual(config.usuario.base, "MasterProfit")
         self.assertEqual(config.usuario.tabla, "employee")
         # <ambiente> vacío: COD_EMP = nombre de la base, misma base de la empresa.
         self.assertEqual(config.ambiente.cod_emp, "PRADO_25")
-        self.assertEqual(config.ambiente.base, "")
+        self.assertFalse(hasattr(config, "caja"))     # La caja ya no va en el XML.
         # Las rutas sin carpeta se resuelven junto al programa.
         self.assertEqual(config.rutas.logo, os.path.join(CARPETA, "logo.png"))
 
-    def test_xml_del_visor_sin_caja_da_error(self):
+    def test_xml_del_visor_sin_usuario_da_error(self):
         ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
                               "<basedatos>b</basedatos></sqlserver></configuracion>")
         with self.assertRaises(ErrorConfiguracion):
@@ -64,26 +66,23 @@ class PruebaConfiguracion(unittest.TestCase):
     def test_seguridad_opcional_y_windows(self):
         ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
                               "<basedatos>b</basedatos><usuario></usuario></sqlserver>"
-                              "<caja><codigo> 02 </codigo></caja>"
                               "<usuario><codigo>ana</codigo><clave>x</clave></usuario>"
                               "</configuracion>")
         config = cargar_configuracion(ruta)
         self.assertEqual(config.usuario.base, "MasterProfit")   # Valor por defecto.
         self.assertTrue(config.sql.usa_autenticacion_windows)
-        self.assertEqual(config.caja.codigo, "02")
         self.assertEqual(config.seguridad.clave_salida, CLAVE_SALIDA_POR_DEFECTO)
 
     def test_falta_usuario_da_error(self):
         ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
                               "<basedatos>b</basedatos></sqlserver>"
-                              "<caja><codigo>01</codigo></caja></configuracion>")
+                              "<ambiente><cod_emp>X</cod_emp></ambiente></configuracion>")
         with self.assertRaises(ErrorConfiguracion):
             cargar_configuracion(ruta)
 
     def test_tabla_con_caracteres_peligrosos_da_error(self):
         ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
                               "<basedatos>b</basedatos></sqlserver>"
-                              "<caja><codigo>01</codigo></caja>"
                               "<usuario><codigo>a</codigo><clave>x</clave>"
                               "<tabla>employee]; DROP TABLE x--</tabla></usuario>"
                               "</configuracion>")
@@ -238,14 +237,40 @@ class PruebaAmbiente(unittest.TestCase):
         self.assertEqual(bd.parametros, ("PRADO_25", "HCIS"))
         self.assertIn("FROM [dbo].[PPV_AMBIENTE]", bd.sql)
 
-        bd = _BaseFalsa(self.FILA)
-        RepositorioAmbiente(bd, ConfigAmbiente(cod_emp="X", base="MasterProfit")).obtener("a")
-        self.assertIn("FROM [MasterProfit].[dbo].[PPV_AMBIENTE]", bd.sql)
 
     def test_usuario_sin_ambiente(self):
         from app.configuracion import ConfigAmbiente
         repo = RepositorioAmbiente(_BaseFalsa(None), ConfigAmbiente(cod_emp="PRADO_25"))
         self.assertIsNone(repo.obtener("HCIS"))
+
+
+class PruebaListaPrecios(unittest.TestCase):
+
+    def test_columna_segun_vd_listprec(self):
+        self.assertEqual(columna_precio("1"), "prec_vta1")
+        self.assertEqual(columna_precio("PREC3"), "prec_vta3")
+        self.assertEqual(columna_precio(" 5 "), "prec_vta5")
+        for invalida in ("", "PREC", "6", "0", "12"):
+            with self.assertRaises(ErrorListaPrecios):
+                columna_precio(invalida)
+
+    def test_consulta_usa_la_lista(self):
+        bd = _BaseFalsa({"codigo": "1", "descripcion": "PAN", "precio": Decimal("2.5"),
+                         "tipo_impuesto": "1"})
+        articulo = RepositorioArticulos(bd, "2").buscar_por_codigo("1")
+        self.assertIn("A.prec_vta2", bd.sql)
+        self.assertEqual(bd.parametros, ("1", "1", "1"))
+        self.assertEqual(articulo.precio, Decimal("2.5"))
+
+
+class PruebaClientes(unittest.TestCase):
+
+    def test_cliente_por_defecto_por_codigo(self):
+        bd = _BaseFalsa({"codigo": "CONTADO", "nombre": "CLIENTE CONTADO", "rif": ""})
+        cliente = RepositorioClientes(bd).buscar_por_codigo(" CONTADO ")
+        self.assertEqual(cliente.codigo, "CONTADO")
+        self.assertEqual(bd.parametros, ("CONTADO",))
+        self.assertIsNone(RepositorioClientes(_BaseFalsa(None)).buscar_por_codigo(""))
 
 
 if __name__ == "__main__":
