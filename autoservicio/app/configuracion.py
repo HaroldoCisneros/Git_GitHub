@@ -2,11 +2,17 @@
 Lectura del archivo de configuración config.xml.
 
 El archivo tiene el MISMO formato que el del Visor de Precios (secciones
-<sqlserver>, <rutas> y <pantalla>) y además dos secciones nuevas:
+<sqlserver>, <rutas> y <pantalla>) y además tres secciones nuevas:
 
     <caja>
         <codigo>01</codigo>            Código de la caja en la tabla "cajas" de Profit.
     </caja>
+    <usuario>
+        <codigo>...</codigo>           Usuario de Profit (tabla employee).
+        <clave>...</clave>             Su clave de Profit.
+        <base>MasterProfit</base>      Base donde está la tabla de usuarios (opcional).
+        <tabla>employee</tabla>        Tabla de usuarios (opcional).
+    </usuario>
     <seguridad>
         <clave_salida>...</clave_salida>   Contraseña para salir de la aplicación.
     </seguridad>
@@ -20,6 +26,7 @@ andar buscando etiquetas XML.
 from __future__ import annotations
 
 import os
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 
@@ -31,6 +38,14 @@ NOMBRE_ARCHIVO = "config.xml"
 # Contraseña provisional para salir de la aplicación. Se usa si el XML no
 # trae la sección <seguridad>.
 CLAVE_SALIDA_POR_DEFECTO = "9898989898"
+
+# Base y tabla de usuarios por defecto (las mismas del Sistema Web).
+BASE_USUARIOS_POR_DEFECTO = "MasterProfit"
+TABLA_USUARIOS_POR_DEFECTO = "employee"
+
+# Los nombres de base y tabla van dentro del texto SQL (no pueden ir como
+# parámetro), por eso solo se aceptan letras, números y "_".
+PATRON_NOMBRE_SQL = re.compile(r"^[A-Za-z0-9_]{1,128}$")
 
 
 class ErrorConfiguracion(Exception):
@@ -83,6 +98,18 @@ class ConfigCaja:
 
 
 @dataclass
+class ConfigUsuario:
+    """
+    Usuario con el que trabaja la caja (sección nueva <usuario>).
+    Se valida contra la tabla de usuarios de Profit al arrancar.
+    """
+    codigo: str
+    clave: str
+    base: str = BASE_USUARIOS_POR_DEFECTO
+    tabla: str = TABLA_USUARIOS_POR_DEFECTO
+
+
+@dataclass
 class ConfigSeguridad:
     """Opciones de seguridad (sección nueva <seguridad>)."""
     clave_salida: str = CLAVE_SALIDA_POR_DEFECTO
@@ -95,6 +122,7 @@ class Configuracion:
     rutas: ConfigRutas
     pantalla: ConfigPantalla
     caja: ConfigCaja
+    usuario: ConfigUsuario
     seguridad: ConfigSeguridad = field(default_factory=ConfigSeguridad)
     archivo: str = ""          # Ruta del XML leído (para mensajes de error).
 
@@ -130,6 +158,15 @@ def _obligatorio(nodo: ET.Element | None, seccion: str, etiqueta: str) -> str:
     valor = _texto(nodo, etiqueta)
     if not valor:
         raise ErrorConfiguracion(f"Falta el valor de <{seccion}><{etiqueta}> en {NOMBRE_ARCHIVO}")
+    return valor
+
+
+def _nombre_sql(nodo: ET.Element | None, seccion: str, etiqueta: str, defecto: str) -> str:
+    """Lee un nombre de base o tabla y comprueba que sea seguro ponerlo dentro del SQL."""
+    valor = _texto(nodo, etiqueta, defecto) or defecto
+    if not PATRON_NOMBRE_SQL.match(valor):
+        raise ErrorConfiguracion(
+            f"<{seccion}><{etiqueta}> solo puede tener letras, números y _ : '{valor}'")
     return valor
 
 
@@ -188,10 +225,20 @@ def cargar_configuracion(ruta: str | None = None) -> Configuracion:
     # --- <caja> (nuevo, obligatorio) ----------------------------------------
     caja = ConfigCaja(codigo=_obligatorio(raiz.find("caja"), "caja", "codigo"))
 
+    # --- <usuario> (nuevo, obligatorio) -------------------------------------
+    nodo_usuario = raiz.find("usuario")
+    usuario = ConfigUsuario(
+        codigo=_obligatorio(nodo_usuario, "usuario", "codigo"),
+        # La clave no se recorta aquí: Profit ya ignora los espacios de los lados.
+        clave=_obligatorio(nodo_usuario, "usuario", "clave"),
+        base=_nombre_sql(nodo_usuario, "usuario", "base", BASE_USUARIOS_POR_DEFECTO),
+        tabla=_nombre_sql(nodo_usuario, "usuario", "tabla", TABLA_USUARIOS_POR_DEFECTO),
+    )
+
     # --- <seguridad> (nuevo, opcional) --------------------------------------
     seguridad = ConfigSeguridad(
         clave_salida=_texto(raiz.find("seguridad"), "clave_salida", CLAVE_SALIDA_POR_DEFECTO),
     )
 
     return Configuracion(sql=sql, rutas=rutas, pantalla=pantalla,
-                         caja=caja, seguridad=seguridad, archivo=ruta)
+                         caja=caja, usuario=usuario, seguridad=seguridad, archivo=ruta)

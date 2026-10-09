@@ -1,15 +1,17 @@
 """
 Controlador general de la aplicación.
 
-Coordina el arranque y el paso entre pantallas:
+Coordina el arranque:
 
     1. Lee el config.xml.
     2. Se conecta a SQL Server y valida que la caja del XML exista en Profit.
-    3. Muestra la pantalla de inicio de sesión.
-    4. Con el usuario validado, abre la pantalla principal (escaneo / factura).
+    3. Valida el usuario y la clave del XML contra MasterProfit.dbo.employee
+       (no se piden en pantalla).
+    4. Abre la pantalla principal (escaneo / factura).
 
-Si algo falla al arrancar (falta el XML, no hay conexión, la caja no
-existe) se muestra el error en pantalla y la aplicación termina.
+Si algo falla al arrancar (falta el XML, no hay conexión, la caja no existe,
+el usuario o la clave no son correctos) se muestra el error en pantalla y la
+aplicación termina sin entrar.
 """
 
 from __future__ import annotations
@@ -25,16 +27,16 @@ from .configuracion import Configuracion, ErrorConfiguracion, cargar_configuraci
 from .modelos import Caja, Usuario
 from .repositorios import (RepositorioArticulos, RepositorioCajas, RepositorioClientes,
                            RepositorioUsuarios)
+from .repositorios.usuarios import ErrorUsuario
 from .ui.dialogos import mostrar_mensaje
 from .ui.estilos import HOJA_ESTILOS
-from .ui.ventana_login import VentanaLogin
 from .ui.ventana_principal import VentanaPrincipal
 
 log = logging.getLogger("autoservicio.aplicacion")
 
 
 class Aplicacion:
-    """Arranca la aplicación y maneja el cambio entre pantallas."""
+    """Arranca la aplicación: validaciones iniciales y pantalla principal."""
 
     def __init__(self, qt_app: QApplication, pantalla_completa: bool = True):
         """
@@ -49,7 +51,7 @@ class Aplicacion:
         self.config: Optional[Configuracion] = None
         self.bd: Optional[BaseDatos] = None
         self.caja: Optional[Caja] = None
-        self._ventana_login: Optional[VentanaLogin] = None
+        self.usuario: Optional[Usuario] = None
         self._ventana_principal: Optional[VentanaPrincipal] = None
 
     # ------------------------------------------------------------------
@@ -58,7 +60,7 @@ class Aplicacion:
 
     def iniciar(self) -> bool:
         """
-        Prepara todo y muestra la pantalla de inicio de sesión.
+        Hace las validaciones iniciales y muestra la pantalla principal.
 
         :return: False si hubo un error que impide arrancar (ya se mostró al usuario).
         """
@@ -70,25 +72,30 @@ class Aplicacion:
         except ErrorConfiguracion as error:
             return self._error_fatal("Error de configuración", str(error))
 
-        # 2. Base de datos y validación de la caja.
         self.bd = BaseDatos(self.config.sql)
         try:
+            # 2. La caja debe existir en Profit.
             self.caja = RepositorioCajas(self.bd).obtener(self.config.caja.codigo)
+            if self.caja is None:
+                return self._error_fatal(
+                    "Caja no válida",
+                    f"La caja '{self.config.caja.codigo}' indicada en config.xml "
+                    "no existe en Profit.")
+            log.info("Caja validada: %s - %s", self.caja.codigo, self.caja.descripcion)
+
+            # 3. Usuario y clave del XML contra la tabla employee.
+            self.usuario = RepositorioUsuarios(self.bd, self.config.usuario).validar()
+
         except ErrorBaseDatos as error:
             return self._error_fatal("Error de conexión", str(error))
+        except ErrorUsuario as error:
+            return self._error_fatal("Usuario no válido", str(error))
 
-        if self.caja is None:
-            return self._error_fatal(
-                "Caja no válida",
-                f"La caja '{self.config.caja.codigo}' indicada en config.xml "
-                "no existe en Profit.")
-
-        log.info("Caja validada: %s - %s", self.caja.codigo, self.caja.descripcion)
-
-        # 3. Pantalla de inicio de sesión.
-        self._ventana_login = VentanaLogin(self.config, self.caja, RepositorioUsuarios(self.bd))
-        self._ventana_login.usuario_validado.connect(self._abrir_principal)
-        self._ventana_login.mostrar(self._pantalla_completa)
+        # 4. Pantalla principal.
+        self._ventana_principal = VentanaPrincipal(
+            self.config, self.caja, self.usuario,
+            RepositorioClientes(self.bd), RepositorioArticulos(self.bd))
+        self._ventana_principal.mostrar(self._pantalla_completa)
         return True
 
     def finalizar(self) -> None:
@@ -96,18 +103,6 @@ class Aplicacion:
         if self.bd is not None:
             self.bd.cerrar()
         log.info("Aplicación cerrada")
-
-    # ------------------------------------------------------------------
-    # Cambio de pantallas
-    # ------------------------------------------------------------------
-
-    def _abrir_principal(self, usuario: Usuario) -> None:
-        """Con el usuario validado, cambia del login a la pantalla de escaneo."""
-        self._ventana_principal = VentanaPrincipal(
-            self.config, self.caja, usuario,
-            RepositorioClientes(self.bd), RepositorioArticulos(self.bd))
-        self._ventana_principal.mostrar(self._pantalla_completa)
-        self._ventana_login.cerrar_desde_programa()
 
     # ------------------------------------------------------------------
     # Errores

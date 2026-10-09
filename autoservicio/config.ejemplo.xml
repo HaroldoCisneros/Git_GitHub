@@ -2,8 +2,8 @@
 <!--
   Archivo de configuración de la Aplicación de Autoservicio.
 
-  Es el mismo formato del config.xml del Visor de Precios, con dos secciones
-  nuevas al final: <caja> y <seguridad>.
+  Es el mismo formato del config.xml del Visor de Precios, con tres secciones
+  nuevas al final: <caja>, <usuario> y <seguridad>.
 
   Para usarlo: copie este archivo como "config.xml" en la MISMA CARPETA del
   ejecutable (o de main.py) y coloque los datos reales. El config.xml real
@@ -45,6 +45,18 @@
     <!-- Código de esta caja. Debe existir en la tabla "cajas" de Profit -->
     <codigo>01</codigo>
   </caja>
+
+  <usuario>
+    <!-- Usuario y clave de Profit con los que trabaja esta caja. No se piden en
+         pantalla: se validan al arrancar contra MasterProfit.dbo.employee
+         (activo, Estado 'A' y clave con la encriptación de Profit).
+         Si no son correctos la aplicación muestra el error y no entra. -->
+    <codigo>CAJA01</codigo>
+    <clave>CAMBIAR</clave>
+    <!-- Opcionales: base y tabla de usuarios (por defecto MasterProfit / employee) -->
+    <base>MasterProfit</base>
+    <tabla>employee</tabla>
+  </usuario>
 
   <seguridad>
     <!-- Contraseña para salir de la aplicación (provisional) -->

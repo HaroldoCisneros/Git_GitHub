@@ -4,9 +4,11 @@ Paquete principal de la Aplicación de Autoservicio.
 Organización de los módulos:
 
     app/
-    ├── configuracion.py   Lectura del config.xml (mismo formato del Visor de Precios + caja).
+    ├── configuracion.py   Lectura del config.xml (mismo formato del Visor de Precios + caja y usuario).
+    ├── encriptacion_profit.py  Validación de claves de Profit (misma lógica del Sistema Web).
     ├── registro.py        Bitácora (log) de la aplicación en un archivo de texto.
     ├── utilidades.py      Funciones de apoyo (formato de montos, rutas, etc.).
+    ├── aplicacion.py      Arranque: valida caja y usuario y abre la pantalla principal.
     ├── modelos.py         Clases de datos: Usuario, Caja, Cliente, Articulo, Factura...
     ├── base_datos.py      Conexión a SQL Server (Profit Plus 2K8) mediante pyodbc.
     ├── repositorios/      Una clase por tabla de Profit: aquí viven TODAS las consultas SQL.

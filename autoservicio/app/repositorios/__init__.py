@@ -5,7 +5,7 @@ Cada módulo de este paquete se encarga de UNA tabla y contiene TODAS las
 consultas SQL sobre ella. Si Profit cambia un campo, o se descubre que un
 dato está en otra columna, solo hay que tocar el repositorio correspondiente.
 
-    usuarios.py   -> tabla de usuarios de la aplicación web (login)
+    usuarios.py   -> tabla employee de MasterProfit (usuario del config.xml)
     cajas.py      -> tabla "cajas" de Profit
     clientes.py   -> tabla "clientes" de Profit
     articulos.py  -> tabla "art" de Profit (búsqueda por código de barras)

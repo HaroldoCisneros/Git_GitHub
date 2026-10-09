@@ -1,6 +1,7 @@
 """
 Pruebas de la lógica que no necesita SQL Server ni pantalla:
-lectura del config.xml, formato de montos y cálculos de la factura.
+lectura del config.xml, formato de montos, cálculos de la factura y
+validación del usuario (encriptación de Profit, con una base simulada).
 
 Ejecutar desde la carpeta autoservicio:
     python -m unittest discover tests
@@ -16,7 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.configuracion import (CLAVE_SALIDA_POR_DEFECTO, ErrorConfiguracion,  # noqa: E402
                                cargar_configuracion)
+from app.encriptacion_profit import (clave_coincide, encriptar,  # noqa: E402
+                                     texto_a_encriptar)
 from app.modelos import Articulo, Caja, Factura, Usuario  # noqa: E402
+from app.repositorios.usuarios import ErrorUsuario, RepositorioUsuarios  # noqa: E402
 from app.utilidades import formatear_monto, solo_digitos  # noqa: E402
 
 CARPETA = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +44,9 @@ class PruebaConfiguracion(unittest.TestCase):
         self.assertEqual(config.pantalla.segundos_producto, 20)
         self.assertEqual(config.caja.codigo, "01")
         self.assertEqual(config.seguridad.clave_salida, "9898989898")
+        self.assertEqual(config.usuario.codigo, "CAJA01")
+        self.assertEqual(config.usuario.base, "MasterProfit")
+        self.assertEqual(config.usuario.tabla, "employee")
         # Las rutas sin carpeta se resuelven junto al programa.
         self.assertEqual(config.rutas.logo, os.path.join(CARPETA, "logo.png"))
 
@@ -52,11 +59,31 @@ class PruebaConfiguracion(unittest.TestCase):
     def test_seguridad_opcional_y_windows(self):
         ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
                               "<basedatos>b</basedatos><usuario></usuario></sqlserver>"
-                              "<caja><codigo> 02 </codigo></caja></configuracion>")
+                              "<caja><codigo> 02 </codigo></caja>"
+                              "<usuario><codigo>ana</codigo><clave>x</clave></usuario>"
+                              "</configuracion>")
         config = cargar_configuracion(ruta)
+        self.assertEqual(config.usuario.base, "MasterProfit")   # Valor por defecto.
         self.assertTrue(config.sql.usa_autenticacion_windows)
         self.assertEqual(config.caja.codigo, "02")
         self.assertEqual(config.seguridad.clave_salida, CLAVE_SALIDA_POR_DEFECTO)
+
+    def test_falta_usuario_da_error(self):
+        ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
+                              "<basedatos>b</basedatos></sqlserver>"
+                              "<caja><codigo>01</codigo></caja></configuracion>")
+        with self.assertRaises(ErrorConfiguracion):
+            cargar_configuracion(ruta)
+
+    def test_tabla_con_caracteres_peligrosos_da_error(self):
+        ruta = self._escribir("<configuracion><sqlserver><servidor>s</servidor>"
+                              "<basedatos>b</basedatos></sqlserver>"
+                              "<caja><codigo>01</codigo></caja>"
+                              "<usuario><codigo>a</codigo><clave>x</clave>"
+                              "<tabla>employee]; DROP TABLE x--</tabla></usuario>"
+                              "</configuracion>")
+        with self.assertRaises(ErrorConfiguracion):
+            cargar_configuracion(ruta)
 
     def test_archivo_inexistente(self):
         with self.assertRaises(ErrorConfiguracion):
@@ -99,6 +126,77 @@ class PruebaFactura(unittest.TestCase):
         self.factura.quitar_linea(0)
         self.assertTrue(self.factura.vacia)
         self.factura.quitar_linea(5)    # Índice inválido: no hace nada.
+
+
+class PruebaEncriptacionProfit(unittest.TestCase):
+
+    def test_formula_foxpro(self):
+        # "A" = 65 -> ((65 + 17) * 11) % 255 = 137
+        self.assertEqual(encriptar("A"), bytes([137]))
+
+    def test_texto_a_encriptar(self):
+        # Ejemplo de la documentación: clave "abc", prioridad 5, mapa "AB".
+        self.assertEqual(texto_a_encriptar(" abc ", 5, "AB"), "ABC  5AB  ")
+
+    def test_clave_coincide(self):
+        guardada = encriptar(texto_a_encriptar("abc", 5, "AB  "))
+        self.assertTrue(clave_coincide("ABC", guardada, 5, "AB  "))
+        self.assertTrue(clave_coincide("abc", guardada, 5, "AB  "))   # No distingue mayúsculas.
+        self.assertFalse(clave_coincide("abd", guardada, 5, "AB  "))
+        self.assertFalse(clave_coincide("abc", guardada, 6, "AB  "))  # Otra prioridad.
+        self.assertFalse(clave_coincide("", guardada, 5, "AB  "))
+
+    def test_clave_larga_se_corta_a_15(self):
+        guardada = encriptar(texto_a_encriptar("CLAVEMUYLARGA123", 10, "XY"))[:15]
+        self.assertTrue(clave_coincide("clavemuylarga123", guardada, 10, "XY"))
+
+
+class _BaseFalsa:
+    """Imita BaseDatos: devuelve una fila fija y guarda la consulta recibida."""
+
+    def __init__(self, fila):
+        self.fila = fila
+        self.sql = None
+        self.parametros = None
+
+    def consultar_uno(self, sql, parametros=()):
+        self.sql, self.parametros = sql, parametros
+        return self.fila
+
+
+class PruebaUsuarios(unittest.TestCase):
+
+    def _config(self, clave="secreta"):
+        from app.configuracion import ConfigUsuario
+        return ConfigUsuario(codigo="hcis", clave=clave)
+
+    def _fila(self, **cambios):
+        fila = {"employee_i": "HCIS", "last_name": "HAROLDO CISNEROS ",
+                "clave": encriptar(texto_a_encriptar("secreta", 5, "AB  ")),
+                "prioridad": 5, "mapa": "AB  ", "activo": 1, "estado": "A"}
+        fila.update(cambios)
+        return fila
+
+    def test_usuario_valido(self):
+        bd = _BaseFalsa(self._fila())
+        usuario = RepositorioUsuarios(bd, self._config()).validar()
+        self.assertEqual(usuario.codigo, "HCIS")
+        self.assertEqual(usuario.nombre, "HAROLDO CISNEROS")
+        self.assertEqual(bd.parametros, ("HCIS",))              # Código en mayúsculas.
+        self.assertIn("[MasterProfit].[dbo].[employee]", bd.sql)
+
+    def test_clave_incorrecta(self):
+        with self.assertRaises(ErrorUsuario):
+            RepositorioUsuarios(_BaseFalsa(self._fila()), self._config("otra")).validar()
+
+    def test_usuario_inexistente(self):
+        with self.assertRaises(ErrorUsuario):
+            RepositorioUsuarios(_BaseFalsa(None), self._config()).validar()
+
+    def test_usuario_inactivo(self):
+        for cambios in ({"activo": 0}, {"estado": "I"}):
+            with self.assertRaises(ErrorUsuario):
+                RepositorioUsuarios(_BaseFalsa(self._fila(**cambios)), self._config()).validar()
 
 
 if __name__ == "__main__":
