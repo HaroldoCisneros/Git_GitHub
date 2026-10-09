@@ -8,6 +8,8 @@ En Profit la cédula puede estar guardada de varias formas ("V-12345678",
 (co_cli). Por eso se le quitan guiones, puntos y espacios y se comparan las
 variantes con y sin la letra.
 
+Solo se aceptan clientes activos (inactivo = 0).
+
 Si la cédula no está registrada, el cliente puede tocar el botón de
 "cliente por defecto": se usa el cliente VD_CLIENTE del ambiente, que se
 busca por su código con ``buscar_por_codigo``.
@@ -30,8 +32,9 @@ SQL_CLIENTE_POR_CEDULA = f"""
                  RTRIM(cli_des) AS nombre,
                  RTRIM(rif)     AS rif
       FROM clientes
-     WHERE {_LIMPIAR.format(campo="rif")}    IN (?, ?, ?)
-        OR {_LIMPIAR.format(campo="co_cli")} IN (?, ?, ?)
+     WHERE inactivo = 0
+       AND ({_LIMPIAR.format(campo="rif")}    IN (?, ?, ?)
+            OR {_LIMPIAR.format(campo="co_cli")} IN (?, ?, ?))
 """
 
 # Busca un cliente por su código (co_cli).
@@ -41,6 +44,7 @@ SQL_CLIENTE_POR_CODIGO = """
            RTRIM(rif)     AS rif
       FROM clientes
      WHERE co_cli = ?
+       AND inactivo = 0
 """
 
 

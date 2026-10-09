@@ -40,7 +40,10 @@ Precios con estas secciones nuevas:
    defecto** (`VD_CLIENTE`).
 4. Pantalla principal: factura nueva → pide la cédula del cliente. Hay un botón
    para continuar sin cédula con el cliente por defecto del ambiente.
-5. Se escanean los artículos (lector en modo teclado, termina con Enter).
+5. Se escanean los artículos (lector en modo teclado, termina con Enter). El código
+   se busca en `co_art`, luego en `CODEB01`…`CODEB10`, `ref` y `modelo`.
+   Cada renglón muestra imagen, descripción, cantidad con botones **−** / **+**,
+   precio, total y botón **Eliminar**.
 6. **Salir** pide la contraseña de salida.
 
 ## Parámetros del ambiente
@@ -69,10 +72,12 @@ app/ui/teclado.py            Teclado virtual (alfanumérico y numérico)
 app/ui/dialogos.py           Diálogos táctiles (pedir dato, mensaje, confirmar)
 app/ui/ventana_kiosco.py     Pantalla completa, salida solo con contraseña
 app/ui/ventana_principal.py  Escaneo de artículos / factura
+app/ui/imagenes.py           De dónde sale la imagen de cada artículo
 tests/                       Pruebas: python -m unittest discover tests
 ```
 
 ## Pendientes
 
 - **Confirmar campos de Profit**: `cajas` (`cod_caja`, `descrip`), formato de `VD_LISTPREC`, % de IVA según `tipo_imp`.
+- **Imagen del artículo**: hoy se busca en la carpeta `<imagenes>` del XML (`co_art.jpg`, como el visor). Confirmar si se usa `art.picture` o `art.imagen1`.
 - **Grabar la factura en Profit** (botón "Finalizar compra").

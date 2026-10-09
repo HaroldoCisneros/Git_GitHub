@@ -203,6 +203,16 @@ class Factura:
         self.lineas.append(linea)
         return linea
 
+    def cambiar_cantidad(self, indice: int, diferencia: Decimal) -> None:
+        """
+        Suma (o resta, si es negativa) ``diferencia`` a la cantidad del renglón.
+
+        La cantidad nunca baja de 1: para sacar el artículo se usa quitar_linea().
+        """
+        if 0 <= indice < len(self.lineas):
+            linea = self.lineas[indice]
+            linea.cantidad = max(Decimal("1"), linea.cantidad + diferencia)
+
     def quitar_linea(self, indice: int) -> None:
         """Elimina el renglón de la posición indicada (si existe)."""
         if 0 <= indice < len(self.lineas):

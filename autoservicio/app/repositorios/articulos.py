@@ -3,12 +3,11 @@ Repositorio de la tabla "art" (artículos) de Profit Plus 2K8.
 
 Se usa cada vez que se escanea un código de barras.
 
-Búsqueda del código (igual que el Sistema Web, inventario/servicios.py):
-  1. Por co_art (en cualquier estado).
-  2. Si no existe, por referencia (campo ref), solo artículos activos.
-  3. Si no existe, por modelo (campo modelo), solo artículos activos.
-La referencia y el modelo son los que permiten encontrar el artículo al
-escanear su código de barras.
+Búsqueda del código escaneado, en este orden (gana el primero que encuentre):
+  1. Por co_art (en cualquier estado), igual que el Sistema Web.
+  2. Por los códigos de barras CODEB01 ... CODEB10, solo artículos activos.
+  3. Por referencia (campo ref), solo artículos activos (Sistema Web).
+  4. Por modelo (campo modelo), solo artículos activos (Sistema Web).
 
 Precio: se usa la lista de precios del ambiente del usuario (VD_LISTPREC).
 El número de lista (1 a 5) indica la columna de "art": prec_vta1 ... prec_vta5.
@@ -52,8 +51,11 @@ def columna_precio(lista_precios: str) -> str:
     return COLUMNAS_PRECIO[int(digitos[0])]
 
 
-# Búsqueda de un artículo por código: co_art, luego ref, luego modelo.
-# El mismo código se pasa tres veces (uno por cada "?").
+# Columnas de códigos de barras de la tabla art.
+COLUMNAS_CODIGO_BARRAS = [f"CODEB{n:02d}" for n in range(1, 11)]
+
+# Búsqueda de un artículo por código: co_art, códigos de barras, ref y modelo.
+# El mismo código se pasa en cada "?" (ver CANTIDAD_PARAMETROS).
 # {precio} es la columna de la lista de precios (prec_vta1 ... prec_vta5).
 SQL_ARTICULO_POR_CODIGO = """
     SELECT TOP 1 RTRIM(A.co_art)   AS codigo,
@@ -62,15 +64,21 @@ SQL_ARTICULO_POR_CODIGO = """
                  RTRIM(A.tipo_imp) AS tipo_impuesto
       FROM (SELECT co_art, 1 AS prioridad FROM art WHERE co_art = ?
             UNION ALL
-            SELECT co_art, 2 FROM art WHERE anulado = 0 AND ref = ?
+            SELECT co_art, 2 FROM art WHERE anulado = 0 AND ? IN ({codigos_barras})
             UNION ALL
-            SELECT co_art, 3 FROM art WHERE anulado = 0 AND modelo = ?) T
+            SELECT co_art, 3 FROM art WHERE anulado = 0 AND ref = ?
+            UNION ALL
+            SELECT co_art, 4 FROM art WHERE anulado = 0 AND modelo = ?) T
       JOIN art A ON A.co_art = T.co_art
      ORDER BY T.prioridad
 """
 
-# Largo máximo de un código; uno más largo es una lectura errónea del lector.
-LARGO_MAXIMO_CODIGO = 40
+# Cantidad de "?" de la consulta (el mismo código va en todos).
+CANTIDAD_PARAMETROS = 4
+
+# Largo máximo de un código (co_art es char(30)); uno más largo es una
+# lectura errónea del lector.
+LARGO_MAXIMO_CODIGO = 30
 
 
 class RepositorioArticulos:
@@ -82,7 +90,9 @@ class RepositorioArticulos:
         :raises ErrorListaPrecios: si la lista no es válida.
         """
         self._bd = bd
-        self._sql = SQL_ARTICULO_POR_CODIGO.format(precio=columna_precio(lista_precios))
+        self._sql = SQL_ARTICULO_POR_CODIGO.format(
+            precio=columna_precio(lista_precios),
+            codigos_barras=", ".join(COLUMNAS_CODIGO_BARRAS))
 
     def buscar_por_codigo(self, codigo: str) -> Optional[Articulo]:
         """
@@ -94,7 +104,7 @@ class RepositorioArticulos:
         if not codigo or len(codigo) > LARGO_MAXIMO_CODIGO:
             return None
 
-        fila = self._bd.consultar_uno(self._sql, (codigo, codigo, codigo))
+        fila = self._bd.consultar_uno(self._sql, (codigo,) * CANTIDAD_PARAMETROS)
         if fila is None:
             return None
 

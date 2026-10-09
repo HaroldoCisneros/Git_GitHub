@@ -125,6 +125,14 @@ class PruebaFactura(unittest.TestCase):
         self.assertEqual(self.factura.impuesto, Decimal("1.60"))
         self.assertEqual(self.factura.total, Decimal("13.10"))
 
+    def test_cambiar_cantidad(self):
+        self.factura.agregar_articulo(self.pan)
+        self.factura.cambiar_cantidad(0, Decimal("1"))
+        self.assertEqual(self.factura.lineas[0].cantidad, Decimal("2"))
+        self.factura.cambiar_cantidad(0, Decimal("-1"))
+        self.factura.cambiar_cantidad(0, Decimal("-1"))   # No baja de 1.
+        self.assertEqual(self.factura.lineas[0].cantidad, Decimal("1"))
+
     def test_quitar_linea(self):
         self.factura.agregar_articulo(self.pan)
         self.factura.quitar_linea(0)
@@ -259,7 +267,9 @@ class PruebaListaPrecios(unittest.TestCase):
                          "tipo_impuesto": "1"})
         articulo = RepositorioArticulos(bd, "2").buscar_por_codigo("1")
         self.assertIn("A.prec_vta2", bd.sql)
-        self.assertEqual(bd.parametros, ("1", "1", "1"))
+        self.assertIn("? IN (CODEB01, CODEB02", bd.sql)
+        self.assertIn("CODEB10)", bd.sql)
+        self.assertEqual(bd.parametros, ("1",) * bd.sql.count("?"))
         self.assertEqual(articulo.precio, Decimal("2.5"))
 
 

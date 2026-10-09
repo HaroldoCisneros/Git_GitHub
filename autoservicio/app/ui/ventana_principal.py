@@ -11,7 +11,8 @@ Flujo de la pantalla:
        en Profit y se agrega a la tabla.
     3. Si el código no se puede leer, el botón "Teclear código" abre el
        teclado para escribirlo a mano.
-    4. "Quitar artículo" elimina el renglón seleccionado.
+    4. Cada renglón muestra la imagen, la descripción, la cantidad con sus
+       botones "−" y "+", el precio, el total y un botón para eliminarlo.
     5. "Cancelar compra" descarta la factura y empieza una nueva.
     6. "Finalizar compra": PENDIENTE (grabar la factura en Profit).
     7. "Salir" pide la contraseña de salida.
@@ -24,6 +25,7 @@ Sobre el lector de códigos de barras:
 
 from __future__ import annotations
 
+import html
 import logging
 import os
 from decimal import Decimal
@@ -32,13 +34,14 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderView, QLabel,
                                QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-                               QVBoxLayout)
+                               QVBoxLayout, QWidget)
 
 from ..base_datos import ErrorBaseDatos
 from ..configuracion import Configuracion
 from ..modelos import Factura, Sesion
 from ..repositorios import RepositorioArticulos, RepositorioClientes
 from ..utilidades import formatear_monto
+from .imagenes import ProveedorImagenes
 from .dialogos import (MODO_ALFANUMERICO, MODO_NUMERICO, OPCION_EXTRA, confirmar,
                        mostrar_mensaje, pedir_texto)
 from .ventana_kiosco import VentanaKiosco
@@ -46,11 +49,15 @@ from .ventana_kiosco import VentanaKiosco
 log = logging.getLogger("autoservicio.principal")
 
 # Columnas de la tabla de artículos.
-COLUMNAS = ["Código", "Descripción", "Cant.", "Precio", "Total"]
-COL_CODIGO, COL_DESCRIPCION, COL_CANTIDAD, COL_PRECIO, COL_TOTAL = range(len(COLUMNAS))
+COLUMNAS = ["Imagen", "Descripción", "Cantidad", "Precio", "Total", ""]
+(COL_IMAGEN, COL_DESCRIPCION, COL_CANTIDAD,
+ COL_PRECIO, COL_TOTAL, COL_ELIMINAR) = range(len(COLUMNAS))
 
-# Alto de cada renglón de la tabla (grande para tocarlo con el dedo).
-ALTO_RENGLON = 56
+# Alto de cada renglón y tamaño de la imagen (grandes para tocarlos con el dedo).
+ALTO_RENGLON = 96
+TAMANO_IMAGEN = 84
+# Lado de los botones "−" y "+" de la cantidad.
+TAMANO_BOTON_CANTIDAD = 60
 # Texto del botón para facturar con el cliente por defecto del ambiente.
 TEXTO_CLIENTE_DEFECTO = "Continuar sin cédula (cliente por defecto)"
 
@@ -75,6 +82,8 @@ class VentanaPrincipal(VentanaKiosco):
         self._repo_clientes = repo_clientes
         self._repo_articulos = repo_articulos
         self._factura = Factura(caja=self._caja, usuario=self._usuario)
+        # Imágenes de los artículos (ver ui/imagenes.py).
+        self._imagenes = ProveedorImagenes(config.rutas, TAMANO_IMAGEN)
         # Para pedir la cédula solo la primera vez que se muestra la ventana.
         self._primera_vez = True
 
@@ -178,19 +187,78 @@ class VentanaPrincipal(VentanaKiosco):
         for columna in range(len(COLUMNAS)):
             cabecera.setSectionResizeMode(columna, QHeaderView.ResizeToContents)
         cabecera.setSectionResizeMode(COL_DESCRIPCION, QHeaderView.Stretch)
+        cabecera.setMinimumSectionSize(TAMANO_IMAGEN + 12)
         return self.tabla
+
+    # ------------------------------------------------------------------
+    # Controles de cada renglón
+    # ------------------------------------------------------------------
+
+    def _crear_celda_imagen(self, codigo: str) -> QLabel:
+        """Imagen del artículo centrada en su celda."""
+        etiqueta = QLabel()
+        etiqueta.setAlignment(Qt.AlignCenter)
+        etiqueta.setPixmap(self._imagenes.imagen(codigo))
+        return etiqueta
+
+    @staticmethod
+    def _crear_celda_descripcion(descripcion: str, codigo: str) -> QLabel:
+        """Descripción en letra grande y, debajo, el código en gris."""
+        # html.escape: la descripción puede traer "&" o "<" (por ejemplo "P&G").
+        etiqueta = QLabel(f"<b>{html.escape(descripcion)}</b><br>"
+                          f"<span style='color:#7B8794; font-size:16px'>{html.escape(codigo)}</span>")
+        etiqueta.setTextFormat(Qt.RichText)
+        etiqueta.setWordWrap(True)
+        etiqueta.setContentsMargins(8, 0, 8, 0)
+        return etiqueta
+
+    def _crear_celda_cantidad(self, fila: int, cantidad: Decimal) -> QWidget:
+        """Botón "−", la cantidad y botón "+"."""
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(6, 0, 6, 0)
+        layout.setSpacing(8)
+
+        menos = QPushButton("−")
+        menos.setProperty("tipo", "tecla")
+        menos.setFixedSize(TAMANO_BOTON_CANTIDAD, TAMANO_BOTON_CANTIDAD)
+        menos.setFocusPolicy(Qt.NoFocus)
+        menos.setEnabled(cantidad > 1)          # La cantidad mínima es 1.
+        menos.clicked.connect(lambda: self._cambiar_cantidad(fila, Decimal("-1")))
+
+        valor = QLabel(self._cantidad(cantidad))
+        valor.setAlignment(Qt.AlignCenter)
+        valor.setMinimumWidth(50)
+        valor.setStyleSheet("font-size: 26px; font-weight: bold;")
+
+        mas = QPushButton("+")
+        mas.setProperty("tipo", "tecla")
+        mas.setFixedSize(TAMANO_BOTON_CANTIDAD, TAMANO_BOTON_CANTIDAD)
+        mas.setFocusPolicy(Qt.NoFocus)
+        mas.clicked.connect(lambda: self._cambiar_cantidad(fila, Decimal("1")))
+
+        layout.addWidget(menos)
+        layout.addWidget(valor)
+        layout.addWidget(mas)
+        return contenedor
+
+    def _crear_celda_eliminar(self, fila: int) -> QWidget:
+        """Botón rojo para eliminar el renglón."""
+        contenedor = QWidget()
+        layout = QHBoxLayout(contenedor)
+        layout.setContentsMargins(6, 0, 6, 0)
+        eliminar = QPushButton("Eliminar")
+        eliminar.setProperty("tipo", "peligro")
+        eliminar.setFocusPolicy(Qt.NoFocus)
+        eliminar.clicked.connect(lambda: self._eliminar_renglon(fila))
+        layout.addWidget(eliminar)
+        return contenedor
 
     def _construir_barra_inferior(self) -> QFrame:
         """Botones de acción y total de la factura."""
         panel = QFrame()
         panel.setObjectName("panel")
         layout = QHBoxLayout(panel)
-
-        self.boton_quitar = QPushButton("Quitar artículo")
-        self.boton_quitar.setProperty("tipo", "peligro")
-        self.boton_quitar.setFocusPolicy(Qt.NoFocus)
-        self.boton_quitar.clicked.connect(self._quitar_articulo)
-        layout.addWidget(self.boton_quitar)
 
         self.boton_cancelar = QPushButton("Cancelar compra")
         self.boton_cancelar.setProperty("tipo", "peligro")
@@ -342,15 +410,17 @@ class VentanaPrincipal(VentanaKiosco):
         # Selecciona el renglón afectado para que el cliente vea qué se agregó.
         self.tabla.selectRow(self._factura.lineas.index(linea))
 
-    def _quitar_articulo(self) -> None:
-        """Quita el renglón seleccionado (pide confirmación)."""
-        fila = self.tabla.currentRow()
-        if fila < 0:
-            mostrar_mensaje(self, "Quitar artículo",
-                            "Toque primero el artículo que desea quitar.")
-        else:
+    def _cambiar_cantidad(self, fila: int, diferencia: Decimal) -> None:
+        """Botones "+" y "−" del renglón."""
+        self._factura.cambiar_cantidad(fila, diferencia)
+        self._refrescar()
+        self.tabla.selectRow(fila)
+
+    def _eliminar_renglon(self, fila: int) -> None:
+        """Botón "Eliminar" del renglón (pide confirmación)."""
+        if 0 <= fila < len(self._factura.lineas):
             descripcion = self._factura.lineas[fila].articulo.descripcion
-            if confirmar(self, "Quitar artículo", f"¿Desea quitar\n{descripcion}?"):
+            if confirmar(self, "Eliminar artículo", f"¿Desea eliminar\n{descripcion}?"):
                 self._factura.quitar_linea(fila)
                 self._refrescar()
         self._enfocar_escaner()
@@ -408,20 +478,21 @@ class VentanaPrincipal(VentanaKiosco):
             self.boton_cliente.setText("Ingresar cédula")
 
         # --- Tabla de artículos ---
+        # Se vuelve a armar completa: una factura de autoservicio tiene pocos
+        # renglones y así cada botón queda ligado a su número de renglón.
+        self.tabla.clearContents()
         self.tabla.setRowCount(len(factura.lineas))
         for fila, linea in enumerate(factura.lineas):
-            valores = {
-                COL_CODIGO: linea.articulo.codigo,
-                COL_DESCRIPCION: linea.articulo.descripcion,
-                COL_CANTIDAD: self._cantidad(linea.cantidad),
-                COL_PRECIO: self._monto(linea.articulo.precio),
-                COL_TOTAL: self._monto(linea.total),
-            }
-            for columna, texto in valores.items():
-                celda = QTableWidgetItem(texto)
-                if columna in (COL_CANTIDAD, COL_PRECIO, COL_TOTAL):
-                    celda.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            articulo = linea.articulo
+            self.tabla.setCellWidget(fila, COL_IMAGEN, self._crear_celda_imagen(articulo.codigo))
+            self.tabla.setCellWidget(fila, COL_DESCRIPCION,
+                                     self._crear_celda_descripcion(articulo.descripcion, articulo.codigo))
+            self.tabla.setCellWidget(fila, COL_CANTIDAD, self._crear_celda_cantidad(fila, linea.cantidad))
+            for columna, monto in ((COL_PRECIO, articulo.precio), (COL_TOTAL, linea.total)):
+                celda = QTableWidgetItem(self._monto(monto))
+                celda.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.tabla.setItem(fila, columna, celda)
+            self.tabla.setCellWidget(fila, COL_ELIMINAR, self._crear_celda_eliminar(fila))
 
         # --- Totales ---
         self.etiqueta_articulos.setText(f"Artículos: {self._cantidad(factura.cantidad_articulos)}")
@@ -429,7 +500,6 @@ class VentanaPrincipal(VentanaKiosco):
 
         # --- Botones: solo activos si hay artículos ---
         hay_articulos = not factura.vacia
-        self.boton_quitar.setEnabled(hay_articulos)
         self.boton_finalizar.setEnabled(hay_articulos)
 
         self._enfocar_escaner()
