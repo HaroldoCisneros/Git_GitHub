@@ -14,8 +14,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
+
+# Los montos de la factura se guardan con 2 decimales (reng_neto, tot_neto...).
+CENTIMOS = Decimal("0.01")
+CIEN = Decimal("100")
+
+
+def redondear(valor: Decimal) -> Decimal:
+    """Redondeo comercial a 2 decimales (0,005 -> 0,01)."""
+    return valor.quantize(CENTIMOS, rounding=ROUND_HALF_UP)
 
 
 @dataclass
@@ -139,12 +148,23 @@ class Cliente:
 
 @dataclass
 class Articulo:
-    """Artículo de Profit (tabla "art") encontrado al escanear un código de barras."""
+    """
+    Artículo encontrado al escanear, con su precio para la cantidad del
+    renglón (lo calcula el procedimiento ppv_buscarart).
+    """
     codigo: str                  # co_art
     descripcion: str             # art_des
-    precio: Decimal              # Precio de venta (sin impuesto)
+    precio: Decimal              # Precio unitario de venta SIN impuesto
     tipo_impuesto: str = ""      # tipo_imp de Profit
-    porcentaje_impuesto: Decimal = Decimal("0")   # % de IVA del artículo
+    porcentaje_impuesto: Decimal = Decimal("0")   # % de IVA ("factor" de ppv_buscarart)
+    # Fila completa que devolvió ppv_buscarart (uni_venta, costos, stock...),
+    # necesaria para grabar el renglón de la factura.
+    datos: Dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    @property
+    def precio_con_impuesto(self) -> Decimal:
+        """Precio unitario con IVA (el que ve el cliente en pantalla)."""
+        return redondear(self.precio * (1 + self.porcentaje_impuesto / CIEN))
 
 
 @dataclass
@@ -155,13 +175,13 @@ class LineaFactura:
 
     @property
     def subtotal(self) -> Decimal:
-        """Precio x cantidad, sin impuesto."""
-        return self.articulo.precio * self.cantidad
+        """Precio x cantidad, sin impuesto, a 2 decimales (reng_neto de Profit)."""
+        return redondear(self.articulo.precio * self.cantidad)
 
     @property
     def impuesto(self) -> Decimal:
-        """Monto del impuesto del renglón."""
-        return self.subtotal * self.articulo.porcentaje_impuesto / Decimal("100")
+        """Monto del IVA del renglón, a 2 decimales."""
+        return redondear(self.subtotal * self.articulo.porcentaje_impuesto / CIEN)
 
     @property
     def total(self) -> Decimal:

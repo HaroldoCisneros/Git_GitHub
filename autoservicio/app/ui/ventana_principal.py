@@ -8,7 +8,9 @@ Flujo de la pantalla:
        cliente por defecto del ambiente (VD_CLIENTE).
     2. Con el cliente identificado, el lector de códigos de barras escribe
        el código en el campo de escaneo y manda "Enter"; el artículo se busca
-       en Profit y se agrega a la tabla.
+       con ppv_buscarart (precio e IVA) y se agrega a la tabla. Cada vez que
+       cambia la cantidad de un renglón se vuelve a pedir el precio, porque
+       puede aplicar el precio de mayor.
     3. Si el código no se puede leer, el botón "Teclear código" abre el
        teclado para escribirlo a mano.
     4. Cada renglón muestra la imagen, la descripción, la cantidad con sus
@@ -268,8 +270,9 @@ class VentanaPrincipal(VentanaKiosco):
 
         layout.addStretch()
 
-        # Cantidad de artículos y total.
+        # Cantidad de artículos, subtotal, IVA y total.
         totales = QVBoxLayout()
+        totales.setSpacing(0)
         self.etiqueta_articulos = QLabel()
         self.etiqueta_articulos.setObjectName("subtitulo")
         self.etiqueta_articulos.setAlignment(Qt.AlignRight)
@@ -392,7 +395,7 @@ class VentanaPrincipal(VentanaKiosco):
             return
 
         try:
-            articulo = self._repo_articulos.buscar_por_codigo(codigo)
+            articulo = self._repo_articulos.buscar(codigo, self._factura.cliente.codigo)
         except ErrorBaseDatos as error:
             mostrar_mensaje(self, "Error", str(error), es_error=True)
             self._enfocar_escaner()
@@ -405,16 +408,47 @@ class VentanaPrincipal(VentanaKiosco):
             self._enfocar_escaner()
             return
 
+        if articulo.precio <= 0:
+            # No se vende un artículo sin precio en la lista del ambiente.
+            log.warning("Artículo sin precio: %s", articulo.codigo)
+            mostrar_mensaje(self, "Producto sin precio",
+                            f"{articulo.descripcion}\nno tiene precio. "
+                            "Avise al personal de la tienda.", es_error=True)
+            self._enfocar_escaner()
+            return
+
         linea = self._factura.agregar_articulo(articulo)
+        if linea.cantidad > 1:
+            # Ya estaba en la factura: la nueva cantidad puede cambiar el precio.
+            self._recalcular_precio(linea)
         self._refrescar()
         # Selecciona el renglón afectado para que el cliente vea qué se agregó.
         self.tabla.selectRow(self._factura.lineas.index(linea))
 
     def _cambiar_cantidad(self, fila: int, diferencia: Decimal) -> None:
-        """Botones "+" y "−" del renglón."""
+        """Botones "+" y "−" del renglón (con la nueva cantidad se recalcula el precio)."""
         self._factura.cambiar_cantidad(fila, diferencia)
+        if 0 <= fila < len(self._factura.lineas):
+            self._recalcular_precio(self._factura.lineas[fila])
         self._refrescar()
         self.tabla.selectRow(fila)
+
+    def _recalcular_precio(self, linea) -> None:
+        """
+        Vuelve a pedir el precio del renglón a ppv_buscarart con su cantidad
+        actual (puede aplicar o dejar de aplicar el precio de mayor).
+        """
+        try:
+            nuevo = self._repo_articulos.buscar(linea.articulo.codigo,
+                                                self._factura.cliente.codigo, linea.cantidad)
+        except ErrorBaseDatos as error:
+            mostrar_mensaje(self, "Error", str(error), es_error=True)
+            return
+        if nuevo is not None and nuevo.precio > 0:
+            if nuevo.precio != linea.articulo.precio:
+                log.info("Precio de %s cambia a %s por cantidad %s",
+                         nuevo.codigo, nuevo.precio, linea.cantidad)
+            linea.articulo = nuevo
 
     def _eliminar_renglon(self, fila: int) -> None:
         """Botón "Eliminar" del renglón (pide confirmación)."""
@@ -488,14 +522,18 @@ class VentanaPrincipal(VentanaKiosco):
             self.tabla.setCellWidget(fila, COL_DESCRIPCION,
                                      self._crear_celda_descripcion(articulo.descripcion, articulo.codigo))
             self.tabla.setCellWidget(fila, COL_CANTIDAD, self._crear_celda_cantidad(fila, linea.cantidad))
-            for columna, monto in ((COL_PRECIO, articulo.precio), (COL_TOTAL, linea.total)):
+            # En pantalla el precio y el total se muestran con IVA incluido.
+            for columna, monto in ((COL_PRECIO, articulo.precio_con_impuesto),
+                                   (COL_TOTAL, linea.total)):
                 celda = QTableWidgetItem(self._monto(monto))
                 celda.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 self.tabla.setItem(fila, columna, celda)
             self.tabla.setCellWidget(fila, COL_ELIMINAR, self._crear_celda_eliminar(fila))
 
         # --- Totales ---
-        self.etiqueta_articulos.setText(f"Artículos: {self._cantidad(factura.cantidad_articulos)}")
+        self.etiqueta_articulos.setText(
+            f"Artículos: {self._cantidad(factura.cantidad_articulos)}    "
+            f"Subtotal: {self._monto(factura.subtotal)}    IVA: {self._monto(factura.impuesto)}")
         self.etiqueta_total.setText(f"Total: {self._monto(factura.total)}")
 
         # --- Botones: solo activos si hay artículos ---

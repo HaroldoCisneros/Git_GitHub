@@ -4,16 +4,12 @@ Imágenes de los artículos.
 Todo lo relacionado con DE DÓNDE sale la foto de un artículo está aquí, para
 cambiar la fuente sin tocar las pantallas.
 
-Fuente actual (PROVISIONAL, la misma del Visor de Precios):
+Fuente (confirmada, la misma del Visor de Precios):
     La carpeta <rutas><imagenes> del config.xml, con un archivo por artículo
     nombrado con su co_art: 00123.jpg, 00124.png ...
 
     Si no hay foto se usa <rutas><imagen_defecto>; si tampoco existe, se
     dibuja un recuadro gris con el texto "Sin imagen".
-
-PENDIENTE: confirmar la fuente definitiva. La tabla "art" de Profit también
-tiene el campo picture (imagen guardada en la base) y los campos imagen1 /
-imagen2 (rutas de archivo).
 
 Las imágenes se guardan en memoria (caché) ya reducidas al tamaño del
 renglón, para no leer el disco cada vez que se redibuja la factura.

@@ -13,7 +13,8 @@ python main.py --ventana               # en ventana, para pruebas
 ```
 
 Requisitos en la caja: Python 3.9+ y el driver **ODBC Driver 17 for SQL Server**.
-El usuario de SQL del XML necesita leer las tablas de la empresa (incluida `PPV_AMBIENTE`) y `MasterProfit.dbo.employee`.
+El usuario de SQL del XML necesita leer las tablas de la empresa (incluida `PPV_AMBIENTE`),
+ejecutar `ppv_buscarart` y leer `MasterProfit.dbo.employee`.
 La caja ya no va en el XML: sale del ambiente del usuario.
 
 ## Configuración (`config.xml`)
@@ -36,14 +37,18 @@ Precios con estas secciones nuevas:
 3. Carga el ambiente del usuario de `PPV_AMBIENTE` (`COD_EMP` + `COD_USU`) con
    **todos** sus parámetros. Si no tiene ambiente creado, muestra el error y no entra.
    Del ambiente salen la **caja** (`VD_CAJA`, se valida en `cajas`), la **lista de
-   precios** (`VD_LISTPREC`, 1 a 5 → `prec_vta1`…`prec_vta5`) y el **cliente por
-   defecto** (`VD_CLIENTE`).
+   precios** (`VD_LISTPREC`: `Lista01`…`Lista05` o `PRECIO G`), el **almacén**
+   (`VD_ALMACEN`) y el **cliente por defecto** (`VD_CLIENTE`).
 4. Pantalla principal: factura nueva → pide la cédula del cliente. Hay un botón
    para continuar sin cédula con el cliente por defecto del ambiente.
-5. Se escanean los artículos (lector en modo teclado, termina con Enter). El código
-   se busca en `co_art`, luego en `CODEB01`…`CODEB10`, `ref` y `modelo`.
-   Cada renglón muestra imagen, descripción, cantidad con botones **−** / **+**,
-   precio, total y botón **Eliminar**.
+5. Se escanean los artículos (lector en modo teclado, termina con Enter). Búsqueda,
+   precio e IVA los resuelve el procedimiento **`ppv_buscarart`** (el mismo del punto
+   de venta): busca en `co_art`, `ref`, `modelo` y `CODEB01`…`CODEB10`, aplica la
+   lista del ambiente y el precio de mayor según la cantidad, y devuelve el % de IVA.
+   Al cambiar la cantidad de un renglón se vuelve a pedir el precio.
+   Cada renglón muestra imagen (carpeta `<imagenes>`, archivo `co_art.jpg/png`),
+   descripción, cantidad con botones **−** / **+**, precio con IVA, total y botón
+   **Eliminar**. Abajo: artículos, subtotal, IVA y total.
 6. **Salir** pide la contraseña de salida.
 
 ## Parámetros del ambiente
@@ -78,6 +83,5 @@ tests/                       Pruebas: python -m unittest discover tests
 
 ## Pendientes
 
-- **Confirmar campos de Profit**: `cajas` (`cod_caja`, `descrip`), formato de `VD_LISTPREC`, % de IVA según `tipo_imp`.
-- **Imagen del artículo**: hoy se busca en la carpeta `<imagenes>` del XML (`co_art.jpg`, como el visor). Confirmar si se usa `art.picture` o `art.imagen1`.
+- **Confirmar** columnas de `cajas` (`cod_caja`, `descrip`).
 - **Grabar la factura en Profit** (botón "Finalizar compra").

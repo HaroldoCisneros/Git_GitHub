@@ -23,7 +23,8 @@ from app.modelos import Articulo, Caja, Factura, Usuario  # noqa: E402
 from app.modelos import Ambiente  # noqa: E402
 from app.repositorios.ambiente import RepositorioAmbiente  # noqa: E402
 from app.repositorios.articulos import (ErrorListaPrecios, RepositorioArticulos,  # noqa: E402
-                                        columna_precio)
+                                        validar_lista_precios)
+from app.modelos import Sesion  # noqa: E402
 from app.repositorios.clientes import RepositorioClientes  # noqa: E402
 from app.repositorios.usuarios import ErrorUsuario, RepositorioUsuarios  # noqa: E402
 from app.utilidades import formatear_monto, solo_digitos  # noqa: E402
@@ -125,6 +126,14 @@ class PruebaFactura(unittest.TestCase):
         self.assertEqual(self.factura.impuesto, Decimal("1.60"))
         self.assertEqual(self.factura.total, Decimal("13.10"))
 
+    def test_redondeo_por_renglon(self):
+        # 3 x 0,335 = 1,005 -> 1,01 ; IVA 16 % de 1,01 = 0,1616 -> 0,16
+        art = Articulo("003", "CHICLE", Decimal("0.335"), porcentaje_impuesto=Decimal("16"))
+        self.factura.agregar_articulo(art, Decimal("3"))
+        self.assertEqual(self.factura.subtotal, Decimal("1.01"))
+        self.assertEqual(self.factura.impuesto, Decimal("0.16"))
+        self.assertEqual(art.precio_con_impuesto, Decimal("0.39"))
+
     def test_cambiar_cantidad(self):
         self.factura.agregar_articulo(self.pan)
         self.factura.cambiar_cantidad(0, Decimal("1"))
@@ -174,6 +183,12 @@ class _BaseFalsa:
     def consultar_uno(self, sql, parametros=()):
         self.sql, self.parametros = sql, parametros
         return self.fila
+
+    def consultar(self, sql, parametros=()):
+        self.sql, self.parametros = sql, parametros
+        if self.fila is None:
+            return []
+        return self.fila if isinstance(self.fila, list) else [self.fila]
 
 
 class PruebaUsuarios(unittest.TestCase):
@@ -252,25 +267,45 @@ class PruebaAmbiente(unittest.TestCase):
         self.assertIsNone(repo.obtener("HCIS"))
 
 
-class PruebaListaPrecios(unittest.TestCase):
+class PruebaArticulos(unittest.TestCase):
 
-    def test_columna_segun_vd_listprec(self):
-        self.assertEqual(columna_precio("1"), "prec_vta1")
-        self.assertEqual(columna_precio("PREC3"), "prec_vta3")
-        self.assertEqual(columna_precio(" 5 "), "prec_vta5")
-        for invalida in ("", "PREC", "6", "0", "12"):
+    def _sesion(self, lista="Lista02"):
+        ambiente = Ambiente({"COD_EMP": "PRADO_25", "COD_USU": "CAJA01",
+                             "VD_LISTPREC": lista, "VD_ALMACEN": "01"})
+        return Sesion(Caja("01", "C"), Usuario("CAJA01", "CAJERO"), ambiente)
+
+    def test_listas_validas(self):
+        for lista in ("Lista01", "LISTA05", "Precio G"):
+            validar_lista_precios(lista)
+        for invalida in ("", "1", "Lista06", "PREC1"):
             with self.assertRaises(ErrorListaPrecios):
-                columna_precio(invalida)
+                validar_lista_precios(invalida)
 
-    def test_consulta_usa_la_lista(self):
-        bd = _BaseFalsa({"codigo": "1", "descripcion": "PAN", "precio": Decimal("2.5"),
-                         "tipo_impuesto": "1"})
-        articulo = RepositorioArticulos(bd, "2").buscar_por_codigo("1")
-        self.assertIn("A.prec_vta2", bd.sql)
-        self.assertIn("? IN (CODEB01, CODEB02", bd.sql)
-        self.assertIn("CODEB10)", bd.sql)
-        self.assertEqual(bd.parametros, ("1",) * bd.sql.count("?"))
-        self.assertEqual(articulo.precio, Decimal("2.5"))
+    def test_llama_ppv_buscarart(self):
+        bd = _BaseFalsa({"CO_ART": "0001   ", "ART_DES": "HARINA ", "PREC_VTA1": Decimal("10"),
+                         "TIPO_IMP": "1", "FACTOR": Decimal("16"), "UNI_VENTA": "UND"})
+        articulo = RepositorioArticulos(bd, self._sesion()).buscar("7591", "CLI1", Decimal("3"))
+        self.assertIn("EXEC dbo.ppv_buscarart", bd.sql)
+        # @lco_art, @lco_usu, @lco_emp, @lco_cli, @ltipo, @CO_ALMA, @TOTAL_ART
+        self.assertEqual(bd.parametros, ("7591", "CAJA01", "PRADO_25", "CLI1", 0, "01", Decimal("3")))
+        self.assertEqual(articulo.codigo, "0001")
+        self.assertEqual(articulo.precio, Decimal("10"))
+        self.assertEqual(articulo.porcentaje_impuesto, Decimal("16"))
+        self.assertEqual(articulo.precio_con_impuesto, Decimal("11.60"))
+        self.assertEqual(articulo.datos["uni_venta"], "UND")
+
+    def test_varias_filas_prefiere_co_art_exacto(self):
+        filas = [{"co_art": "OTRO", "art_des": "X", "prec_vta1": 1, "factor": 0},
+                 {"co_art": "7591", "art_des": "Y", "prec_vta1": 2, "factor": 0}]
+        articulo = RepositorioArticulos(_BaseFalsa(filas), self._sesion()).buscar("7591", "C")
+        self.assertEqual(articulo.descripcion, "Y")
+
+    def test_no_existe(self):
+        self.assertIsNone(RepositorioArticulos(_BaseFalsa(None), self._sesion()).buscar("9", "C"))
+
+    def test_lista_invalida_al_crear(self):
+        with self.assertRaises(ErrorListaPrecios):
+            RepositorioArticulos(_BaseFalsa(None), self._sesion("1"))
 
 
 class PruebaClientes(unittest.TestCase):

@@ -9,7 +9,8 @@ Coordina el arranque:
     3. Carga el ambiente del usuario (tabla PPV_AMBIENTE) con todos sus
        parámetros.
     4. Valida que la caja del ambiente (VD_CAJA) exista en la tabla cajas.
-    5. Valida la lista de precios del ambiente (VD_LISTPREC).
+    5. Valida la lista de precios del ambiente (VD_LISTPREC); el precio y el
+       IVA de cada artículo los calcula el procedimiento ppv_buscarart.
     6. Abre la pantalla principal (escaneo / factura).
 
 Si algo falla al arrancar (falta el XML, no hay conexión, el usuario o la
@@ -100,8 +101,10 @@ class Aplicacion:
                     f"(VD_CAJA = '{codigo_caja}') no existe en Profit.")
             log.info("Caja validada: %s - %s", caja.codigo, caja.descripcion)
 
+            self.sesion = Sesion(caja=caja, usuario=usuario, ambiente=ambiente)
+
             # 5. Lista de precios del ambiente (VD_LISTPREC).
-            repo_articulos = RepositorioArticulos(self.bd, ambiente.lista_precios)
+            repo_articulos = RepositorioArticulos(self.bd, self.sesion)
 
         except ErrorBaseDatos as error:
             return self._error_fatal("Error de conexión", str(error))
@@ -109,8 +112,6 @@ class Aplicacion:
             return self._error_fatal("Usuario no válido", str(error))
         except ErrorListaPrecios as error:
             return self._error_fatal("Lista de precios no válida", str(error))
-
-        self.sesion = Sesion(caja=caja, usuario=usuario, ambiente=ambiente)
 
         # 6. Pantalla principal.
         self._ventana_principal = VentanaPrincipal(
