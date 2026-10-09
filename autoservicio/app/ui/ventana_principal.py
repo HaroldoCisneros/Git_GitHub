@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QHeaderVi
 
 from ..base_datos import ErrorBaseDatos
 from ..configuracion import Configuracion
-from ..modelos import Caja, Factura, Usuario
+from ..modelos import Factura, Sesion
 from ..repositorios import RepositorioArticulos, RepositorioClientes
 from ..utilidades import formatear_monto
 from .dialogos import (MODO_ALFANUMERICO, MODO_NUMERICO, confirmar, mostrar_mensaje,
@@ -56,15 +56,20 @@ ALTO_LOGO = 70
 class VentanaPrincipal(VentanaKiosco):
     """Pantalla donde el cliente escanea sus artículos."""
 
-    def __init__(self, config: Configuracion, caja: Caja, usuario: Usuario,
+    def __init__(self, config: Configuracion, sesion: Sesion,
                  repo_clientes: RepositorioClientes, repo_articulos: RepositorioArticulos):
+        """
+        :param sesion: caja, usuario y ambiente (PPV_AMBIENTE) validados al arrancar.
+            Los parámetros del ambiente se leen con ``self._sesion.ambiente``.
+        """
         super().__init__(config.seguridad.clave_salida)
         self._config = config
-        self._caja = caja
-        self._usuario = usuario
+        self._sesion = sesion
+        self._caja = sesion.caja
+        self._usuario = sesion.usuario
         self._repo_clientes = repo_clientes
         self._repo_articulos = repo_articulos
-        self._factura = Factura(caja=caja, usuario=usuario)
+        self._factura = Factura(caja=self._caja, usuario=self._usuario)
         # Para pedir la cédula solo la primera vez que se muestra la ventana.
         self._primera_vez = True
 

@@ -13,6 +13,10 @@ El archivo tiene el MISMO formato que el del Visor de Precios (secciones
         <base>MasterProfit</base>      Base donde está la tabla de usuarios (opcional).
         <tabla>employee</tabla>        Tabla de usuarios (opcional).
     </usuario>
+    <ambiente>                         (sección opcional)
+        <cod_emp>...</cod_emp>         Empresa en PPV_AMBIENTE (por defecto, <basedatos>).
+        <base>...</base>               Base donde está PPV_AMBIENTE (por defecto, la de la empresa).
+    </ambiente>
     <seguridad>
         <clave_salida>...</clave_salida>   Contraseña para salir de la aplicación.
     </seguridad>
@@ -110,6 +114,17 @@ class ConfigUsuario:
 
 
 @dataclass
+class ConfigAmbiente:
+    """
+    Dónde buscar el ambiente del usuario (sección nueva y opcional <ambiente>).
+
+    El ambiente es la fila de PPV_AMBIENTE con la llave COD_EMP + COD_USU.
+    """
+    cod_emp: str          # Valor de COD_EMP. Por defecto el nombre de la base de la empresa.
+    base: str = ""        # Vacío = la base de la empresa (la de <sqlserver><basedatos>).
+
+
+@dataclass
 class ConfigSeguridad:
     """Opciones de seguridad (sección nueva <seguridad>)."""
     clave_salida: str = CLAVE_SALIDA_POR_DEFECTO
@@ -123,6 +138,7 @@ class Configuracion:
     pantalla: ConfigPantalla
     caja: ConfigCaja
     usuario: ConfigUsuario
+    ambiente: ConfigAmbiente
     seguridad: ConfigSeguridad = field(default_factory=ConfigSeguridad)
     archivo: str = ""          # Ruta del XML leído (para mensajes de error).
 
@@ -164,6 +180,8 @@ def _obligatorio(nodo: ET.Element | None, seccion: str, etiqueta: str) -> str:
 def _nombre_sql(nodo: ET.Element | None, seccion: str, etiqueta: str, defecto: str) -> str:
     """Lee un nombre de base o tabla y comprueba que sea seguro ponerlo dentro del SQL."""
     valor = _texto(nodo, etiqueta, defecto) or defecto
+    if not valor:
+        return ""          # Opcional y sin valor: se usa la base de la conexión.
     if not PATRON_NOMBRE_SQL.match(valor):
         raise ErrorConfiguracion(
             f"<{seccion}><{etiqueta}> solo puede tener letras, números y _ : '{valor}'")
@@ -235,10 +253,18 @@ def cargar_configuracion(ruta: str | None = None) -> Configuracion:
         tabla=_nombre_sql(nodo_usuario, "usuario", "tabla", TABLA_USUARIOS_POR_DEFECTO),
     )
 
+    # --- <ambiente> (nuevo, opcional) ---------------------------------------
+    nodo_ambiente = raiz.find("ambiente")
+    ambiente = ConfigAmbiente(
+        cod_emp=_texto(nodo_ambiente, "cod_emp") or sql.basedatos,
+        base=_nombre_sql(nodo_ambiente, "ambiente", "base", ""),
+    )
+
     # --- <seguridad> (nuevo, opcional) --------------------------------------
     seguridad = ConfigSeguridad(
         clave_salida=_texto(raiz.find("seguridad"), "clave_salida", CLAVE_SALIDA_POR_DEFECTO),
     )
 
     return Configuracion(sql=sql, rutas=rutas, pantalla=pantalla,
-                         caja=caja, usuario=usuario, seguridad=seguridad, archivo=ruta)
+                         caja=caja, usuario=usuario, ambiente=ambiente,
+                         seguridad=seguridad, archivo=ruta)

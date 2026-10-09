@@ -20,6 +20,8 @@ from app.configuracion import (CLAVE_SALIDA_POR_DEFECTO, ErrorConfiguracion,  # 
 from app.encriptacion_profit import (clave_coincide, encriptar,  # noqa: E402
                                      texto_a_encriptar)
 from app.modelos import Articulo, Caja, Factura, Usuario  # noqa: E402
+from app.modelos import Ambiente  # noqa: E402
+from app.repositorios.ambiente import RepositorioAmbiente  # noqa: E402
 from app.repositorios.usuarios import ErrorUsuario, RepositorioUsuarios  # noqa: E402
 from app.utilidades import formatear_monto, solo_digitos  # noqa: E402
 
@@ -47,6 +49,9 @@ class PruebaConfiguracion(unittest.TestCase):
         self.assertEqual(config.usuario.codigo, "CAJA01")
         self.assertEqual(config.usuario.base, "MasterProfit")
         self.assertEqual(config.usuario.tabla, "employee")
+        # <ambiente> vacío: COD_EMP = nombre de la base, misma base de la empresa.
+        self.assertEqual(config.ambiente.cod_emp, "PRADO_25")
+        self.assertEqual(config.ambiente.base, "")
         # Las rutas sin carpeta se resuelven junto al programa.
         self.assertEqual(config.rutas.logo, os.path.join(CARPETA, "logo.png"))
 
@@ -197,6 +202,50 @@ class PruebaUsuarios(unittest.TestCase):
         for cambios in ({"activo": 0}, {"estado": "I"}):
             with self.assertRaises(ErrorUsuario):
                 RepositorioUsuarios(_BaseFalsa(self._fila(**cambios)), self._config()).validar()
+
+
+class PruebaAmbiente(unittest.TestCase):
+
+    FILA = {"COD_EMP": "PRADO_25", "COD_USU": "HCIS  ", "VD_ALMACEN": "01    ",
+            "VD_LISTPREC": "PREC1  ", "VE_BSALIR": True, "TOPE1": Decimal("10.5"),
+            "VP_RUTIMA": " "}
+
+    def test_acceso_a_todas_las_columnas(self):
+        ambiente = Ambiente(self.FILA)
+        self.assertEqual(ambiente["VD_ALMACEN"], "01")          # Sin relleno de espacios.
+        self.assertEqual(ambiente["vd_almacen"], "01")          # Sin importar mayúsculas.
+        self.assertEqual(ambiente.VD_LISTPREC, "PREC1")
+        self.assertIs(ambiente.VE_BSALIR, True)
+        self.assertEqual(ambiente.get("TOPE1"), Decimal("10.5"))
+        self.assertEqual(ambiente.VP_RUTIMA, "")
+        self.assertEqual(ambiente.almacen, "01")                 # Alias en español.
+        self.assertEqual(ambiente.usuario, "HCIS")
+        self.assertIn("VE_BSALIR", ambiente)
+        self.assertIsNone(ambiente.get("NO_EXISTE"))
+        self.assertEqual(len(ambiente.como_diccionario()), len(self.FILA))
+        with self.assertRaises(KeyError):
+            ambiente["NO_EXISTE"]
+        with self.assertRaises(AttributeError):
+            ambiente.NO_EXISTE
+        with self.assertRaises(AttributeError):
+            ambiente.VD_ALMACEN = "02"                             # Solo lectura.
+
+    def test_repositorio(self):
+        from app.configuracion import ConfigAmbiente
+        bd = _BaseFalsa(self.FILA)
+        ambiente = RepositorioAmbiente(bd, ConfigAmbiente(cod_emp="PRADO_25")).obtener("hcis")
+        self.assertEqual(ambiente.almacen, "01")
+        self.assertEqual(bd.parametros, ("PRADO_25", "HCIS"))
+        self.assertIn("FROM [dbo].[PPV_AMBIENTE]", bd.sql)
+
+        bd = _BaseFalsa(self.FILA)
+        RepositorioAmbiente(bd, ConfigAmbiente(cod_emp="X", base="MasterProfit")).obtener("a")
+        self.assertIn("FROM [MasterProfit].[dbo].[PPV_AMBIENTE]", bd.sql)
+
+    def test_usuario_sin_ambiente(self):
+        from app.configuracion import ConfigAmbiente
+        repo = RepositorioAmbiente(_BaseFalsa(None), ConfigAmbiente(cod_emp="PRADO_25"))
+        self.assertIsNone(repo.obtener("HCIS"))
 
 
 if __name__ == "__main__":

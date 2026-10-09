@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -25,11 +25,108 @@ class Usuario:
     nombre: str
 
 
+class Ambiente:
+    """
+    Ambiente del usuario: la fila completa de la tabla PPV_AMBIENTE
+    (llave COD_EMP + COD_USU) con TODOS sus parámetros.
+
+    Cualquier columna se puede leer de tres formas, siempre por su nombre en
+    la tabla (sin importar mayúsculas o minúsculas):
+
+        ambiente["VD_ALMACEN"]        # como diccionario
+        ambiente.VD_ALMACEN           # como atributo
+        ambiente.get("VD_ALMACEN")    # devuelve None (o un defecto) si no existe
+
+    Los campos de texto (CHAR / TEXT) vienen sin los espacios de relleno de
+    SQL Server; los BIT llegan como True/False; los NUMERIC como Decimal.
+
+    Para los parámetros más usados hay además propiedades con nombre en
+    español (almacen, vendedor, ...). Ver la tabla de abajo.
+    """
+
+    # Propiedades con nombre en español -> columna de PPV_AMBIENTE.
+    # PENDIENTE DE CONFIRMAR: el significado se dedujo del nombre de la columna.
+    ALIAS = {
+        "empresa": "COD_EMP",
+        "usuario": "COD_USU",
+        "condicion_pago": "VD_CONDICION",
+        "cliente": "VD_CLIENTE",
+        "vendedor": "VD_VENDEDOR",
+        "transporte": "VD_TRANSPORTE",
+        "moneda": "VD_MONEDA",
+        "almacen": "VD_ALMACEN",
+        "banco": "VD_BANCO",
+        "punto_venta": "VD_PUNTO",
+        "caja": "VD_CAJA",
+        "lista_precios": "VD_LISTPREC",
+        "impresora": "VD_IMPRESORA",
+        "puerto_impresora": "VD_PUERTO",
+    }
+
+    def __init__(self, valores: Dict[str, Any]):
+        """
+        :param valores: la fila de PPV_AMBIENTE como diccionario {columna: valor}.
+        """
+        # Se guarda con los nombres en mayúsculas para buscar sin importar cómo se escriban.
+        object.__setattr__(self, "_valores", {
+            str(columna).upper(): (valor.strip() if isinstance(valor, str) else valor)
+            for columna, valor in valores.items()
+        })
+
+    # --- Acceso por nombre de columna ------------------------------------
+
+    def __getitem__(self, columna: str) -> Any:
+        try:
+            return self._valores[columna.upper()]
+        except KeyError:
+            raise KeyError(f"PPV_AMBIENTE no tiene la columna '{columna}'") from None
+
+    def __getattr__(self, nombre: str) -> Any:
+        # Solo se llama si el atributo no existe en la clase: se busca como columna.
+        if nombre.startswith("_"):
+            raise AttributeError(nombre)
+        if nombre in Ambiente.ALIAS:
+            return self._valores.get(Ambiente.ALIAS[nombre])
+        try:
+            return self._valores[nombre.upper()]
+        except KeyError:
+            raise AttributeError(f"PPV_AMBIENTE no tiene la columna '{nombre}'") from None
+
+    def __setattr__(self, nombre: str, valor: Any) -> None:
+        # El ambiente es de solo lectura: se carga una vez al arrancar.
+        raise AttributeError("El ambiente es de solo lectura")
+
+    def __contains__(self, columna: str) -> bool:
+        return columna.upper() in self._valores
+
+    def get(self, columna: str, defecto: Any = None) -> Any:
+        """Valor de la columna, o ``defecto`` si la columna no existe."""
+        return self._valores.get(columna.upper(), defecto)
+
+    def como_diccionario(self) -> Dict[str, Any]:
+        """Copia de todos los parámetros {COLUMNA: valor}."""
+        return dict(self._valores)
+
+    def __repr__(self) -> str:
+        return f"Ambiente(empresa={self.empresa!r}, usuario={self.usuario!r}, columnas={len(self._valores)})"
+
+
 @dataclass
 class Caja:
     """Caja de Profit en la que está instalada la aplicación (tabla "cajas")."""
     codigo: str
     descripcion: str
+
+
+@dataclass
+class Sesion:
+    """
+    Datos validados al arrancar, que se usan en toda la aplicación:
+    la caja, el usuario del config.xml y su ambiente de PPV_AMBIENTE.
+    """
+    caja: "Caja"
+    usuario: Usuario
+    ambiente: Ambiente
 
 
 @dataclass
