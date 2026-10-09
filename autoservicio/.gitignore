@@ -1,0 +1,9 @@
+# El config.xml real tiene la clave de SQL Server: no se sube.
+config.xml
+*.log
+*.log.*
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Archivo de configuración de la Aplicación de Autoservicio.
+
+  Es el mismo formato del config.xml del Visor de Precios, con dos secciones
+  nuevas al final: <caja> y <seguridad>.
+
+  Para usarlo: copie este archivo como "config.xml" en la MISMA CARPETA del
+  ejecutable (o de main.py) y coloque los datos reales. El config.xml real
+  no se sube al repositorio porque contiene la clave de SQL Server.
+-->
+<configuracion>
+  <sqlserver>
+    <servidor>appsrv</servidor>
+    <basedatos>PRADO_25</basedatos>
+    <!-- Si deja usuario vacío se usa la autenticación de Windows -->
+    <usuario>profit</usuario>
+    <clave>CAMBIAR</clave>
+    <driver>ODBC Driver 17 for SQL Server</driver>
+  </sqlserver>
+
+  <rutas>
+    <!-- Carpeta de las fotos, cada una nombrada con el co_art: 00123.jpg, 00124.png ... -->
+    <imagenes>J:\AplicaciPython\VisorPrecios</imagenes>
+    <!-- Las rutas sin carpeta se buscan junto al programa -->
+    <video>VisordePrecios.mp4</video>
+    <logo>logo.png</logo>
+    <!-- Imagen cuando el producto no tiene foto (si no existe se usa un ícono) -->
+    <imagen_defecto>sin_imagen.png</imagen_defecto>
+  </rutas>
+
+  <pantalla>
+    <!-- Segundos que se muestra el producto antes de volver al video -->
+    <segundos_producto>20</segundos_producto>
+    <simbolo_moneda>$</simbolo_moneda>
+    <decimales>2</decimales>
+    <separador_miles>.</separador_miles>
+    <separador_decimal>,</separador_decimal>
+    <!-- Se muestra solo si no hay logo -->
+    <nombre_negocio>Mi Negocio</nombre_negocio>
+  </pantalla>
+
+  <!-- ===== NUEVO: solo para el Autoservicio ===== -->
+  <caja>
+    <!-- Código de esta caja. Debe existir en la tabla "cajas" de Profit -->
+    <codigo>01</codigo>
+  </caja>
+
+  <seguridad>
+    <!-- Contraseña para salir de la aplicación (provisional) -->
+    <clave_salida>9898989898</clave_salida>
+  </seguridad>
+</configuracion>
