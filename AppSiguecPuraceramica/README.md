@@ -58,7 +58,14 @@ queda guardada en cada teléfono. Por eso:
 `art_des varchar(120)`, `tipo char(1)` (V venta, C consumo, **S servicio**,
 F fabricación, M materia prima, N envase, E empaque), `anulado bit`,
 `modelo varchar(20)` y `ref varchar(20)` ("otra codificación para el artículo").
-**No tiene columna de código de barras**: se escanean co_art, modelo y ref.
+**No tiene columna de código de barras**: el código de barras puede venir en
+`co_art`, `modelo` o `ref`, y se busca en los tres (si coincide en varios, gana
+co_art, luego modelo, luego ref; sin distinguir mayúsculas).
+
+**Etiquetas con la fuente C39HrP48DhTt** = Code 39: el escáner la lee (es el primer
+formato configurado). Se quitan los asteriscos de inicio y fin (`*CER-001*`).
+Code 39 solo codifica MAYÚSCULAS, números, espacio y `- . $ / + %`: un código con
+otros caracteres (ñ, _, #, minúsculas) no sale bien en la etiqueta.
 
 Si algún nombre es distinto o hay otra columna/tabla con los códigos de barra, no
 se cambia la App: se agrega un renglón en `SIGUEC_PURACERAMICA.dbo.parametros`:

@@ -43,6 +43,9 @@ class LogicaTest {
         assertEquals("%tubo%pvc%", Inventario.patronLike(" tubo*pvc "))
         assertEquals("%50\\%\\_%", Inventario.patronLike("50%_"))
         assertEquals("", Inventario.patronLike(""))
+        // Fuente Code 39 (C39HrP48DhTt): los asteriscos de inicio y fin no son parte del código
+        assertEquals("CER-001", Inventario.limpiarCodigo(" *CER-001* "))
+        assertEquals("CER-001", Inventario.limpiarCodigo("CER-001"))
         assertNotNull(Inventario.validarCantidad("0,0000001"))
     }
 

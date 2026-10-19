@@ -63,6 +63,14 @@ object Inventario {
         return null
     }
 
+    /**
+     * Lo escaneado o escrito -> código para buscar.
+     * Las etiquetas se imprimen con la fuente Code 39 "C39HrP48DhTt": el código va entre
+     * asteriscos (*CER-001*), que son las marcas de inicio y fin. Algunos escáneres los
+     * entregan dentro del texto: se quitan, igual que los espacios de los lados.
+     */
+    fun limpiarCodigo(texto: String): String = texto.trim().trim('*').trim()
+
     /** Suma exacta de cantidades guardadas como texto ("2.5" + "6" = "8.5"). */
     fun sumar(cantidades: List<String>): String =
         texto(cantidades.fold(java.math.BigDecimal.ZERO) { suma, c -> suma + (c.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO) })

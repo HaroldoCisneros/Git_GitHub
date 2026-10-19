@@ -117,7 +117,7 @@ class ArticulosViewModel(
 
     /** La cámara leyó un código: se busca ese código. */
     fun alLeerCodigo(codigo: String) {
-        _estado.update { it.copy(texto = codigo) }
+        _estado.update { it.copy(texto = com.siguec.puraceramica.core.red.Inventario.limpiarCodigo(codigo)) }
         buscar()
     }
 

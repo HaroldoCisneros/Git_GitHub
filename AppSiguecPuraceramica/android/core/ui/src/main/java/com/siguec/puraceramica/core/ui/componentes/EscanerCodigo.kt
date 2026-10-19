@@ -20,16 +20,17 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
  */
 object EscanerCodigo {
 
-    // Formatos de los productos (cerámicas, porcelanatos...: EAN/UPC de fábrica, Code 128/39 de
+    // Las etiquetas propias se imprimen con la fuente "C39HrP48DhTt" = CODE 39 (va primero).
+    // También los de fábrica (EAN/UPC) y Code 128/39 de
     // etiquetas propias) y QR por si acaso. Limitar los formatos hace la lectura más rápida.
     private val opciones = GmsBarcodeScannerOptions.Builder()
         .setBarcodeFormats(
+            Barcode.FORMAT_CODE_39,  // Etiquetas con la fuente C39HrP48DhTt
             Barcode.FORMAT_EAN_13,  // El más común en productos (13 dígitos)
             Barcode.FORMAT_EAN_8,   // EAN corto
             Barcode.FORMAT_UPC_A,   // Productos de EE. UU.
             Barcode.FORMAT_UPC_E,   // UPC corto
-            Barcode.FORMAT_CODE_128, // Etiquetas impresas por la empresa
-            Barcode.FORMAT_CODE_39,
+            Barcode.FORMAT_CODE_128, // Otras etiquetas impresas
             Barcode.FORMAT_CODE_93,
             Barcode.FORMAT_ITF,
             Barcode.FORMAT_CODABAR,
@@ -48,7 +49,8 @@ object EscanerCodigo {
             .startScan()
             // Leyó un código: se le quitan los espacios a los lados
             .addOnSuccessListener { codigo ->
-                val texto = codigo.rawValue?.trim().orEmpty()
+                // Sin los asteriscos de inicio/fin de Code 39 (*CER-001*) ni espacios
+                val texto = codigo.rawValue?.trim()?.trim('*')?.trim().orEmpty()
                 if (texto.isNotEmpty()) alLeer(texto) else alFallar("No se pudo leer el código. Intente de nuevo.")
             }
             // No se pudo abrir (teléfono sin Play Services, módulo descargándose...)

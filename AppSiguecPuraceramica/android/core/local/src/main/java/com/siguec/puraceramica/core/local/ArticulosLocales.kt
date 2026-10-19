@@ -112,12 +112,16 @@ class ArticulosLocales internal constructor(private val base: BaseLocal) {
         pag.map { (coArt, artDes) -> ArticuloDto(coArt, artDes, contados[coArt]) } to (filas.size > tamano)
     }
 
-    /** Lo escaneado -> artículo (gana la prioridad más baja: co_art, luego modelo, ref, barras). */
+    /**
+     * Lo escaneado -> artículo. Se busca en co_art, modelo y ref (y la tabla de barras si la hay);
+     * si el código está en varios, gana co_art, luego modelo, luego ref. Sin distinguir
+     * mayúsculas de minúsculas (Code 39 solo imprime mayúsculas).
+     */
     suspend fun porCodigo(coEmpresa: String, codigo: String): ArticuloDto? = withContext(Dispatchers.IO) {
         base.readableDatabase.rawQuery(
             """SELECT a.co_art, a.art_des FROM codigos k JOIN articulos a ON a.co_empresa = k.co_empresa AND a.co_art = k.co_art
                WHERE k.co_empresa = ? AND k.codigo = ? ORDER BY a.anulado, k.prioridad, a.co_art LIMIT 1""",
-            arrayOf(coEmpresa, codigo.trim())
+            arrayOf(coEmpresa, Inventario.limpiarCodigo(codigo))
         ).use(::articulo)
     }
 

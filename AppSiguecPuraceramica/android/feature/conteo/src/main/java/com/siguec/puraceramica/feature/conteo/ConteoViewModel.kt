@@ -91,13 +91,13 @@ class ConteoViewModel(
 
     /** La cámara leyó un código. */
     fun alLeerCodigo(codigo: String) {
-        _estado.update { it.copy(codigo = codigo, articulo = null) }
+        _estado.update { it.copy(codigo = Inventario.limpiarCodigo(codigo), articulo = null) }
         if (_estado.value.modoRapido) anotar(cantidadFija = "1") else buscarArticulo()
     }
 
     /** Busca el artículo del código (escrito o escaneado) para confirmarlo antes de anotar. */
     fun buscarArticulo() {
-        val codigo = _estado.value.codigo.trim()
+        val codigo = Inventario.limpiarCodigo(_estado.value.codigo)
         if (codigo.isEmpty()) return
         _estado.update { it.copy(buscando = true) }
         viewModelScope.launch {
@@ -131,7 +131,7 @@ class ConteoViewModel(
         _estado.update { it.copy(anotando = true) }
         viewModelScope.launch {
             val articulo = local.articulos.porCodigo(coEmpresa, e.codigo)
-            val r = articulo?.let { local.inventarios.anotar(id, it.coArt, it.artDes, e.codigo.trim(), valor, usuario) }
+            val r = articulo?.let { local.inventarios.anotar(id, it.coArt, it.artDes, Inventario.limpiarCodigo(e.codigo), valor, usuario) }
             when {
                 articulo == null -> _estado.update { it.copy(anotando = false, aviso = noExiste(e.codigo)) }
                 r == null -> _estado.update {

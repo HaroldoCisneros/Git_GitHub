@@ -21,7 +21,9 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
    hash guardado de la última entrada con WiFi de ese usuario en ese teléfono.
    Permisos: consultar_articulos, sincronizar_articulos, contar_inventario, cerrar_inventario.
 6. `saArticulo` confirmado con el script de la base real (ver README). Sin columna de código
-   de barras: se escanean co_art, modelo, ref. Se excluyen servicios (tipo 'S').
+   de barras: CONFIRMADO por el usuario que el código de barras viene en co_art, modelo o ref
+   (se busca en los tres). Etiquetas con fuente C39HrP48DhTt = Code 39 (se quitan los "*").
+   Se excluyen servicios (tipo 'S').
    Nombres configurables en `SIGUEC_PURACERAMICA.dbo.parametros` (claves profit.*).
 7. Envío idempotente: clave de envío (UUID) generada en el teléfono, UNIQUE en `envios`.
 8. Cantidades como texto y sumas con BigDecimal (formato venezolano en pantalla).
@@ -32,6 +34,5 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
   y cambiar `TomaFisicaProfit.actual`. Definir cómo se acumulan los envíos de varios
   teléfonos en la misma toma (sumar sobre lo existente o renglones por envío).
   Actualizar GRANT en sql/03.
-- Confirmar dónde están los códigos de barra (¿campo1..8? ¿tabla aparte?).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
   :core:red sí se compiló y probó: 15 pruebas OK).
