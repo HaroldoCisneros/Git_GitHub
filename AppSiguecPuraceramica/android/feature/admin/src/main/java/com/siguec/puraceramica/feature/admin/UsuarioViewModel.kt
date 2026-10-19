@@ -103,7 +103,7 @@ class UsuarioViewModel(
         viewModelScope.launch {
             when (val r = repositorio.cambiarClave(id, clave)) {
                 is Resultado.Exito -> _estado.update { it.copy(guardando = false,
-                    aviso = "Clave cambiada: tendrá que entrar de nuevo en sus teléfonos") }
+                    aviso = "Clave cambiada (en cada teléfono vale desde su próxima entrada con WiFi)") }
                 is Resultado.Error -> _estado.update { it.copy(guardando = false, aviso = r.mensaje) }
             }
         }

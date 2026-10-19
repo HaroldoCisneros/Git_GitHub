@@ -67,9 +67,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.siguec.puraceramica.core.red.ArticuloDto
 import com.siguec.puraceramica.core.red.Formato
 import com.siguec.puraceramica.core.red.Inventario
-import com.siguec.puraceramica.core.red.RepositorioArticulos
-import com.siguec.puraceramica.core.red.RepositorioInventarios
 import com.siguec.puraceramica.core.red.SincronizacionDto
+import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
 import com.siguec.puraceramica.core.ui.componentes.Cargando
 import com.siguec.puraceramica.core.ui.componentes.EscanerCodigo
@@ -78,10 +77,10 @@ import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
 import com.siguec.puraceramica.core.ui.tema.ColoresMarca
 
 /**
- * Pantalla "Artículos": consulta de la copia sincronizada con Profit 2K12.
+ * Pantalla "Artículos": consulta de la copia del TELÉFONO (funciona sin WiFi).
  * De cada artículo SOLO se muestra el código, la descripción y el stock contado
  * (si ya se contó en el inventario elegido).
- * Con el permiso "sincronizar", el botón de arriba baja los artículos de Profit.
+ * Con el permiso "sincronizar", el botón de arriba baja los artículos de Profit (con WiFi).
  *
  * @param puedeSincronizar permiso "sincronizar artículos" del ambiente
  * @param inventarioInicial último inventario en que se contó (se propone)
@@ -89,15 +88,16 @@ import com.siguec.puraceramica.core.ui.tema.ColoresMarca
 @OptIn(ExperimentalMaterial3Api::class) // FilterChip
 @Composable
 fun PantallaArticulos(
-    repositorio: RepositorioArticulos,
-    inventarios: RepositorioInventarios,
+    gestor: GestorSesion,
+    coEmpresa: String,
     nombreEmpresa: String,
     puedeSincronizar: Boolean,
     inventarioInicial: Int?,
     alVolver: () -> Unit
 ) {
     val vm: ArticulosViewModel = viewModel(
-        factory = viewModelFactory { initializer { ArticulosViewModel(repositorio, inventarios, inventarioInicial) } }
+        key = "articulos-$coEmpresa",
+        factory = viewModelFactory { initializer { ArticulosViewModel(gestor, coEmpresa, inventarioInicial) } }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val contexto = LocalContext.current
@@ -163,7 +163,7 @@ fun PantallaArticulos(
                     label = { Text("Sin inventario") })
                 estado.inventarios.forEach { inv ->
                     FilterChip(selected = estado.inventarioId == inv.id, onClick = { vm.elegirInventario(inv.id) },
-                        label = { Text("N° ${inv.id} · Alm. ${inv.coAlma}") })
+                        label = { Text("Toma ${inv.numero} · Alm. ${inv.coAlma}") })
                 }
                 if (estado.inventarioId != null) {
                     FilterChip(selected = estado.soloContados, onClick = vm::alternarSoloContados,
@@ -178,7 +178,7 @@ fun PantallaArticulos(
                     estado.mensajeError != null && estado.articulos.isEmpty() ->
                         MensajeError(estado.mensajeError.orEmpty(), alReintentar = vm::buscar)
                     estado.articulos.isEmpty() -> MensajeVacio(
-                        if (estado.ultima == null) "Todavía no se han sincronizado los artículos con Profit."
+                        if (estado.ultima == null) "Este teléfono todavía no tiene los artículos: sincronice con Profit (con WiFi)."
                         else "No hay artículos que coincidan.")
                     else -> LazyColumn(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
@@ -207,8 +207,8 @@ fun PantallaArticulos(
             onDismissRequest = { confirmarSincronizar = false },
             title = { Text("Sincronizar con Profit") },
             text = {
-                Text("Se bajan todos los artículos de Profit (código, descripción y códigos para escanear). " +
-                    "Lo contado no se pierde. Puede tardar unos segundos.")
+                Text("Conéctese al WiFi de la empresa. Se bajan todos los artículos de Profit (código, " +
+                    "descripción y códigos para escanear) a este teléfono. Lo contado no se pierde.")
             },
             confirmButton = {
                 TextButton(onClick = { confirmarSincronizar = false; vm.sincronizar() }) { Text("Sincronizar") }

@@ -71,16 +71,15 @@ import com.siguec.puraceramica.core.red.ConteoDto
 import com.siguec.puraceramica.core.red.Formato
 import com.siguec.puraceramica.core.red.Inventario
 import com.siguec.puraceramica.core.red.InventarioDto
-import com.siguec.puraceramica.core.red.RepositorioArticulos
-import com.siguec.puraceramica.core.red.RepositorioConteos
-import com.siguec.puraceramica.core.red.RepositorioInventarios
+import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
 import com.siguec.puraceramica.core.ui.componentes.Cargando
 import com.siguec.puraceramica.core.ui.componentes.EscanerCodigo
 import com.siguec.puraceramica.core.ui.componentes.MensajeError
 
 /**
- * Pantalla de contar (un inventario abierto de un almacén):
+ * Pantalla de contar (una toma física abierta de un almacén), SIN WiFi: todo se
+ * guarda en el teléfono y se envía a Profit desde "Inventarios".
  *  - Botón grande "Escanear": la cámara lee el código de barras y se muestra el
  *    artículo con lo ya contado; se escribe la cantidad y "Anotar".
  *  - Modo rápido: cada escaneo anota 1 y la cámara se abre otra vez.
@@ -90,16 +89,16 @@ import com.siguec.puraceramica.core.ui.componentes.MensajeError
  */
 @Composable
 fun PantallaConteo(
-    inventarios: RepositorioInventarios,
-    articulos: RepositorioArticulos,
-    conteos: RepositorioConteos,
+    gestor: GestorSesion,
+    coEmpresa: String,
     nombreEmpresa: String,
     id: Int,
+    usuario: String,
     alVolver: () -> Unit
 ) {
     val vm: ConteoViewModel = viewModel(
-        key = "conteo-$id",
-        factory = viewModelFactory { initializer { ConteoViewModel(inventarios, articulos, conteos, id) } }
+        key = "conteo-$id-$usuario",
+        factory = viewModelFactory { initializer { ConteoViewModel(gestor.local, coEmpresa, id, usuario) } }
     )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val contexto = LocalContext.current
@@ -134,13 +133,12 @@ fun PantallaConteo(
         }
     }
 
-    val detalle = estado.detalle
-    val inventario = detalle?.inventario
+    val inventario = estado.inventario
 
     Scaffold(
         topBar = {
             BarraSuperior(
-                titulo = inventario?.let { "Contar · ${Inventario.titulo(it)}" } ?: "Contar N° $id",
+                titulo = inventario?.let { "Contar · ${Inventario.titulo(it)}" } ?: "Contar",
                 subtitulo = nombreEmpresa,
                 alVolver = alVolver,
                 acciones = {
@@ -152,14 +150,13 @@ fun PantallaConteo(
     ) { margenes ->
         Box(Modifier.fillMaxSize().padding(margenes)) {
             when {
-                estado.cargando && detalle == null -> Cargando("Abriendo el inventario...")
-                detalle == null || inventario == null ->
-                    MensajeError(estado.mensajeError ?: "No se pudo abrir el inventario", alReintentar = vm::cargar)
+                estado.cargando -> Cargando("Abriendo el inventario...")
+                inventario == null -> MensajeError(estado.mensajeError ?: "No se encontró la toma", alReintentar = vm::cargar)
                 else -> LazyColumn(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item { Encabezado(inventario, detalle.contadoPorMi) }
+                    item { Encabezado(inventario, estado.contadoPorMi) }
 
                     if (inventario.abierto) {
                         // ---------- Escanear y anotar ----------
@@ -224,10 +221,10 @@ fun PantallaConteo(
                         Text("Mis últimos conteos", style = MaterialTheme.typography.titleSmall,
                             modifier = Modifier.padding(top = 8.dp))
                     }
-                    if (detalle.misConteos.isEmpty()) {
+                    if (estado.misConteos.isEmpty()) {
                         item { Text("Todavía no ha contado nada aquí.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
-                    items(detalle.misConteos, key = { it.id }) { c -> RenglonConteo(c, alBorrar = { vm.borrar(c) }) }
+                    items(estado.misConteos, key = { it.id }) { c -> RenglonConteo(c, alBorrar = { vm.borrar(c) }) }
                 }
             }
         }
@@ -242,10 +239,10 @@ private fun Encabezado(inventario: InventarioDto, contadoPorMi: Int) {
         else MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(16.dp)) {
             Text(inventario.descripcion, style = MaterialTheme.typography.titleMedium)
-            Text("Usted lleva $contadoPorMi conteos · entre todos ${inventario.conteos}",
+            Text("Usted lleva $contadoPorMi conteos · en este teléfono ${inventario.conteos}",
                 style = MaterialTheme.typography.bodySmall)
             if (!inventario.abierto) {
-                Text("INVENTARIO CERRADO: ya no se puede contar", style = MaterialTheme.typography.labelLarge,
+                Text("ENVIADA A PROFIT: ya no se puede contar", style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold)
             }
         }

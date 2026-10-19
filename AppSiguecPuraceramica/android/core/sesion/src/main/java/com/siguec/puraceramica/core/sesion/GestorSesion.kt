@@ -1,44 +1,49 @@
 // MÓDULO :core:sesion
 package com.siguec.puraceramica.core.sesion
 
-// Contexto de Android (para el archivo de preferencias)
+// Contexto de Android y modelo del teléfono
 import android.content.Context
-// Marca y modelo del teléfono
 import android.os.Build
-// Piezas de la red (módulo :core:red)
+// Base del teléfono (módulo :core:local)
+import com.siguec.puraceramica.core.local.AlmacenLocal
+// Conexión directa al SQL Server (módulo :core:red)
 import com.siguec.puraceramica.core.red.AmbienteDto
-import com.siguec.puraceramica.core.red.ClienteSiguec
+import com.siguec.puraceramica.core.red.BaseDatos
+import com.siguec.puraceramica.core.red.ConfigConexion
+import com.siguec.puraceramica.core.red.RepositorioAcceso
 import com.siguec.puraceramica.core.red.RepositorioAdmin
-import com.siguec.puraceramica.core.red.RepositorioArticulos
-import com.siguec.puraceramica.core.red.RepositorioConteos
-import com.siguec.puraceramica.core.red.RepositorioInventarios
-import com.siguec.puraceramica.core.red.RepositorioSesionRemota
+import com.siguec.puraceramica.core.red.RepositorioInventarioProfit
+import com.siguec.puraceramica.core.red.RepositorioProfit
 import com.siguec.puraceramica.core.red.Resultado
-import com.siguec.puraceramica.core.red.SaludDto
+import com.siguec.puraceramica.core.red.Seguridad
 import com.siguec.puraceramica.core.red.SesionDto
 import com.siguec.puraceramica.core.red.TipoError
+import com.siguec.puraceramica.core.red.UsuarioDto
 // Estado observable por las pantallas
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
 /**
- * Dueño ÚNICO de la sesión en el teléfono. Lo crea :app una sola vez
- * (SiguecApp) y se lo pasa a las pantallas.
+ * Dueño ÚNICO de la sesión en el teléfono. Lo crea :app una sola vez (SiguecApp).
  *
- *  - entrar()        Usuario + clave en el servidor elegido; guarda el token.
- *  - restaurar()     Al abrir la App: si hay token guardado y sigue vigente, entra solo.
- *  - elegirEmpresa() El ambiente (empresa de Profit) con el que se trabaja.
- *  - articulos(), inventarios(), conteos()  Repositorios de la empresa elegida.
- *  - salir()         Cierra la sesión en el servidor y borra el token.
- *
- * Si en cualquier momento el servidor dice "sesión vencida" (401), se borra
- * el token y [sesionVencida] pasa a true: :app vuelve a la pantalla de entrada.
+ *  - conexion / guardarConexion() / probarConexion()   Pantalla Configuración.
+ *  - entrar()        Con WiFi: contra el SQL Server. Sin WiFi: con la clave guardada de la
+ *                    última vez que ese usuario entró CON WiFi en este teléfono.
+ *  - restaurar()     Al abrir la App: si quedó una sesión abierta, entra solo.
+ *  - elegirEmpresa() La empresa de Profit con la que se trabaja.
+ *  - local           La base del teléfono (artículos, inventarios y conteos): sin WiFi.
+ *  - profit(), inventarioProfit(), admin()   Lo que necesita WiFi (SQL Server).
+ *  - salir()         Cierra la sesión en el teléfono.
  */
 class GestorSesion(contexto: Context) {
 
-    // Lo que queda guardado en el teléfono
     private val almacen = AlmacenSesion(contexto.applicationContext)
+
+    /** Base del teléfono: se cuenta aquí, sin WiFi. */
+    val local = AlmacenLocal(contexto.applicationContext)
 
     // Sesión actual (null = nadie ha entrado)
     private val _sesion = MutableStateFlow<SesionDto?>(null)
@@ -48,78 +53,81 @@ class GestorSesion(contexto: Context) {
     private val _ambiente = MutableStateFlow<AmbienteDto?>(null)
     val ambiente: StateFlow<AmbienteDto?> = _ambiente.asStateFlow()
 
-    // true = el servidor rechazó el token: hay que volver a la pantalla de entrada
-    private val _sesionVencida = MutableStateFlow(false)
-    val sesionVencida: StateFlow<Boolean> = _sesionVencida.asStateFlow()
-
-    // Cliente de la API para la dirección actual (se crea de nuevo si cambia la dirección)
-    private var cliente: ClienteSiguec? = null
-
-    /** Dirección del servidor guardada. */
-    val urlServidor: String get() = almacen.urlServidor
+    /** "Zebra TC21": queda en la bitácora. */
+    val dispositivo: String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
 
     /** Último usuario que entró. */
     val ultimoUsuario: String get() = almacen.ultimoUsuario
 
-    /** "Zebra TC21": queda en la bitácora del servidor. */
-    private val dispositivo: String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
+    /** El usuario que está usando la App (null sin sesión). */
+    val usuario: UsuarioDto? get() = _sesion.value?.usuario
 
-    /**
-     * Cliente para esa dirección.
-     * @return null si la dirección no es válida
-     */
-    private fun cliente(url: String = almacen.urlServidor): ClienteSiguec? {
-        val normalizada = ClienteSiguec.normalizarUrl(url) ?: return null
-        cliente?.takeIf { it.urlBase == normalizada }?.let { return it }
-        return ClienteSiguec(url, token = { almacen.token }, alVencerSesion = ::alVencerSesion)
-            .also { cliente = it }
+    // ---------- Configuración de la conexión ----------
+
+    /** Datos de conexión guardados. */
+    val conexion: ConfigConexion get() = almacen.conexion
+
+    /** ¿Ya se configuró la conexión? (la primera vez se abre Configuración). */
+    val conexionConfigurada: Boolean get() = almacen.conexion.completa
+
+    fun guardarConexion(config: ConfigConexion) {
+        almacen.conexion = config
     }
 
-    private fun errorDireccion() =
-        Resultado.Error("Escriba una dirección de servidor válida (ej. siguec.miempresa.com).", TipoError.VALIDACION)
+    /** Prueba una configuración (sin guardarla). */
+    suspend fun probarConexion(config: ConfigConexion): Resultado<String> =
+        RepositorioAcceso(BaseDatos(config), dispositivo).probar()
 
-    /** Prueba si en esa dirección responde el servidor de AppSiguecPuraceramica. */
-    suspend fun probarServidor(url: String): Resultado<SaludDto> {
-        val c = cliente(url) ?: return errorDireccion()
-        return RepositorioSesionRemota(c).probarServidor()
-    }
+    private fun bd() = BaseDatos(almacen.conexion)
+    private fun acceso() = RepositorioAcceso(bd(), dispositivo)
+
+    // ---------- Entrar y salir ----------
 
     /**
-     * Entra con usuario y clave. Si sale bien guarda la dirección, el usuario y
-     * el token, y si el usuario tiene UNA sola empresa la deja elegida.
+     * Entra con usuario y clave. Primero intenta con el SQL Server; si no hay WiFi,
+     * usa la clave guardada de la última entrada con WiFi en este teléfono.
      */
-    suspend fun entrar(url: String, usuario: String, clave: String): Resultado<SesionDto> {
-        val c = cliente(url) ?: return errorDireccion()
-        val resultado = RepositorioSesionRemota(c).entrar(usuario, clave, dispositivo)
-        if (resultado is Resultado.Exito) {
-            almacen.urlServidor = url.trim()
-            almacen.ultimoUsuario = resultado.valor.usuario.usuario
-            almacen.token = resultado.valor.token
-            iniciar(resultado.valor)
+    suspend fun entrar(usuario: String, clave: String): Resultado<SesionDto> {
+        val codigo = usuario.trim().uppercase()
+        return when (val r = acceso().entrar(codigo, clave)) {
+            is Resultado.Exito -> {
+                // Se recuerda el HASH (no la clave) para poder entrar después sin WiFi
+                almacen.recordar(codigo, UsuarioRecordado(r.valor.claveHash, r.valor.sesion))
+                iniciar(r.valor.sesion)
+                Resultado.Exito(r.valor.sesion)
+            }
+            is Resultado.Error -> when (r.tipo) {
+                TipoError.SIN_CONEXION -> entrarSinConexion(codigo, clave, r.mensaje)
+                // Inactivo o sin empresas: ya no puede entrar tampoco sin WiFi
+                TipoError.CLAVE -> {
+                    if (r.mensaje.contains("inactivo") || r.mensaje.contains("ninguna empresa")) almacen.recordar(codigo, null)
+                    r
+                }
+                else -> r
+            }
         }
-        return resultado
     }
 
-    /**
-     * Al abrir la App: si hay un token guardado pregunta al servidor si sigue vigente.
-     * @return null si no había token; el resultado del servidor si lo había
-     */
-    suspend fun restaurar(): Resultado<SesionDto>? {
-        if (almacen.token.isNullOrBlank()) return null
-        val c = cliente() ?: return null
-        val resultado = RepositorioSesionRemota(c).sesion()
-        when {
-            resultado is Resultado.Exito -> iniciar(resultado.valor)
-            // Solo se borra el token si el servidor lo rechazó (sin internet se conserva)
-            (resultado as Resultado.Error).tipo == TipoError.SESION -> almacen.token = null
-        }
-        return resultado
+    private suspend fun entrarSinConexion(codigo: String, clave: String, motivo: String): Resultado<SesionDto> {
+        val recordado = almacen.recordado(codigo)
+            ?: return Resultado.Error("$motivo\nSin WiFi solo pueden entrar los usuarios que ya entraron " +
+                "una vez con WiFi en este teléfono.", TipoError.SIN_CONEXION)
+        // PBKDF2 tarda ~1 s: fuera del hilo de la pantalla
+        val coincide = withContext(Dispatchers.Default) { Seguridad.claveCoincide(clave, recordado.claveHash) }
+        if (!coincide) return Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
+        val sesion = recordado.sesion.copy(sinConexion = true)
+        iniciar(sesion)
+        return Resultado.Exito(sesion)
     }
+
+    /** Al abrir la App: la sesión que quedó abierta (null = hay que entrar). */
+    fun restaurar(): SesionDto? = almacen.sesion?.also { iniciar(it) }
 
     /** Deja la sesión en memoria y elige la empresa si se puede. */
     private fun iniciar(sesion: SesionDto) {
+        almacen.sesion = sesion
+        almacen.ultimoUsuario = sesion.usuario.usuario
         _sesion.value = sesion
-        _sesionVencida.value = false
         // La empresa de la vez anterior, si todavía la tiene; o la única que tiene
         val anterior = sesion.ambientes.firstOrNull { it.coEmpresa == almacen.empresa }
         _ambiente.value = anterior ?: sesion.ambientes.singleOrNull()
@@ -131,68 +139,30 @@ class GestorSesion(contexto: Context) {
         _ambiente.value = ambiente
     }
 
-    /**
-     * Repositorio de artículos (consulta y sincronización) de la empresa elegida.
-     * @return null si todavía no hay empresa elegida
-     */
-    fun articulos(): RepositorioArticulos? {
-        val empresa = _ambiente.value ?: return null
-        val c = cliente() ?: return null
-        return RepositorioArticulos(c, empresa.coEmpresa)
+    /** Cierra la sesión en el teléfono (los conteos guardados NO se borran). */
+    fun salir() {
+        almacen.sesion = null
+        _sesion.value = null
+        _ambiente.value = null
     }
 
-    /** Repositorio de inventarios por almacén de la empresa elegida (null sin empresa). */
-    fun inventarios(): RepositorioInventarios? {
-        val empresa = _ambiente.value ?: return null
-        val c = cliente() ?: return null
-        return RepositorioInventarios(c, empresa.coEmpresa)
-    }
+    // ---------- Último inventario en que se contó ----------
 
-    /** Repositorio de los conteos (escanear y anotar) de la empresa elegida (null sin empresa). */
-    fun conteos(): RepositorioConteos? {
-        val empresa = _ambiente.value ?: return null
-        val c = cliente() ?: return null
-        return RepositorioConteos(c, empresa.coEmpresa)
-    }
-
-    /** Último inventario en que se contó en la empresa elegida (null = ninguno). */
     fun ultimoInventario(): Int? = _ambiente.value?.let { almacen.inventario(it.coEmpresa) }
 
-    /** Recuerda el inventario en que se está contando (null = olvidarlo, por ejemplo al cerrarse). */
     fun recordarInventario(id: Int?) {
         _ambiente.value?.let { almacen.guardarInventario(it.coEmpresa, id) }
     }
 
-    /** Repositorio de administración (usuarios, permisos y bitácora); no depende de la empresa. */
-    fun admin(): RepositorioAdmin? = cliente()?.let { RepositorioAdmin(it) }
+    // ---------- Lo que necesita WiFi (conexión directa al SQL Server) ----------
 
-    /**
-     * Cierra la sesión. En el teléfono se borra DE UNA VEZ (la pantalla vuelve
-     * a la entrada aunque no haya internet); después se avisa al servidor con
-     * el token que se tenía, para que deje de servir.
-     */
-    suspend fun salir() {
-        val token = almacen.token
-        val url = almacen.urlServidor
-        borrarSesion()
-        if (token.isNullOrBlank() || ClienteSiguec.normalizarUrl(url) == null) return
-        RepositorioSesionRemota(ClienteSiguec(url, token = { token })).salir()
-    }
+    /** Leer los artículos de Profit (sincronizar). */
+    fun profit(): RepositorioProfit = bd().let { RepositorioProfit(it, RepositorioAcceso(it, dispositivo)) }
 
-    /** La pantalla de entrada ya mostró el aviso de sesión vencida. */
-    fun avisoVencidaMostrado() {
-        _sesionVencida.value = false
-    }
+    /** Traer las tomas físicas abiertas y enviar lo contado. */
+    fun inventarioProfit(): RepositorioInventarioProfit =
+        bd().let { RepositorioInventarioProfit(it, RepositorioAcceso(it, dispositivo)) }
 
-    // El servidor respondió 401 a una petición normal
-    private fun alVencerSesion() {
-        borrarSesion()
-        _sesionVencida.value = true
-    }
-
-    private fun borrarSesion() {
-        almacen.token = null
-        _sesion.value = null
-        _ambiente.value = null
-    }
+    /** Administración de usuarios (null sin sesión). */
+    fun admin(): RepositorioAdmin? = usuario?.let { RepositorioAdmin(bd(), it, dispositivo) }
 }

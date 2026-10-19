@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warehouse
 // Componentes de Material 3
 import androidx.compose.material3.Card
@@ -54,25 +55,29 @@ import com.siguec.puraceramica.core.ui.componentes.LogoSiguec
  * @param nombreUsuario nombre del usuario que entró
  * @param nombreEmpresa empresa elegida (se muestra en la barra)
  * @param variasEmpresas true = se muestra "Cambiar empresa"
+ * @param sinConexion entró sin WiFi (se avisa: contar sí, sincronizar/traer/enviar no)
  * @param puedeContar permiso "contar inventario": opción "Contar"
  * @param puedeConsultar permiso "consultar artículos" o "sincronizar": opción "Artículos"
- * @param puedePreparar permiso "preparar inventario": opción "Inventarios por almacén"
+ * @param puedeInventarios permiso "contar" o "cerrar": opción "Inventarios" (traer de Profit / enviar)
  * @param esAdministrador el usuario administra la App (usuarios, permisos y bitácora)
+ * @param alConfiguracion opción "Configuración" (datos de la conexión al SQL Server)
  */
 @Composable
 fun PantallaInicio(
     nombreUsuario: String,
     nombreEmpresa: String,
     variasEmpresas: Boolean,
+    sinConexion: Boolean,
     puedeContar: Boolean,
     puedeConsultar: Boolean,
-    puedePreparar: Boolean,
+    puedeInventarios: Boolean,
     esAdministrador: Boolean,
     alContar: () -> Unit,
     alAbrirArticulos: () -> Unit,
     alAbrirInventarios: () -> Unit,
     alAbrirUsuarios: () -> Unit,
     alAbrirBitacora: () -> Unit,
+    alConfiguracion: () -> Unit,
     alCambiarEmpresa: () -> Unit,
     alCerrarSesion: () -> Unit,
     alSalir: () -> Unit
@@ -106,13 +111,18 @@ fun PantallaInicio(
             LogoSiguec(Modifier.fillMaxWidth())
             Text("Hola, $nombreUsuario", style = MaterialTheme.typography.headlineSmall)
             Text("Toma de inventario", style = MaterialTheme.typography.bodyLarge)
+            if (sinConexion) {
+                Text("Entró sin WiFi: puede contar. Para sincronizar, traer o enviar inventarios conéctese " +
+                    "al WiFi de la empresa.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary)
+            }
 
             // ---------- Opción 1: Contar (lo más usado, va primero) ----------
             if (puedeContar) {
                 OpcionMenu(
                     icono = Icons.Filled.QrCodeScanner,
                     titulo = "Contar",
-                    descripcion = "Elegir el inventario abierto del almacén y escanear los códigos de barra",
+                    descripcion = "Elegir la toma abierta del almacén y escanear los códigos de barra (sin WiFi)",
                     alTocar = alContar
                 )
             }
@@ -122,17 +132,17 @@ fun PantallaInicio(
                 OpcionMenu(
                     icono = Icons.Filled.Inventory2,
                     titulo = "Artículos",
-                    descripcion = "Consultar código, descripción y stock contado; sincronizar con Profit",
+                    descripcion = "Consultar código, descripción y stock contado; sincronizar con Profit (WiFi)",
                     alTocar = alAbrirArticulos
                 )
             }
 
-            // ---------- Opción 3: Inventarios por almacén ----------
-            if (puedePreparar) {
+            // ---------- Opción 3: Inventarios (tomas físicas de Profit) ----------
+            if (puedeInventarios) {
                 OpcionMenu(
                     icono = Icons.Filled.Warehouse,
-                    titulo = "Inventarios por almacén",
-                    descripcion = "Preparar (abrir) el inventario de un almacén, ver diferencias y cerrarlo",
+                    titulo = "Inventarios",
+                    descripcion = "Traer de Profit las tomas físicas abiertas y, al terminar, enviar lo contado (WiFi)",
                     alTocar = alAbrirInventarios
                 )
             }
@@ -148,10 +158,18 @@ fun PantallaInicio(
                 OpcionMenu(
                     icono = Icons.Filled.History,
                     titulo = "Bitácora",
-                    descripcion = "Quién entró, sincronizó, preparó o cerró inventarios y cuándo",
+                    descripcion = "Quién entró, sincronizó, trajo o envió inventarios y cuándo",
                     alTocar = alAbrirBitacora
                 )
             }
+
+            // ---------- Configuración de la conexión ----------
+            OpcionMenu(
+                icono = Icons.Filled.Settings,
+                titulo = "Configuración",
+                descripcion = "Datos de la conexión al SQL Server (servidor, puerto, usuario y clave)",
+                alTocar = alConfiguracion
+            )
 
             // ---------- Cambiar empresa ----------
             if (variasEmpresas) {

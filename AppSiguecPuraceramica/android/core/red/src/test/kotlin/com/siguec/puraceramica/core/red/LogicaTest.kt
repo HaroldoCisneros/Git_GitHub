@@ -31,13 +31,26 @@ class LogicaTest {
         assertEquals(-1, Inventario.signo("-1"))
         assertEquals("Sin contar", Inventario.contado(null))
         assertEquals("Contado: 8,5", Inventario.contado("8.5"))
-        assertEquals("N° 3 · Almacén 01 PRINCIPAL", Inventario.titulo(InventarioDto(id = 3, coAlma = "01", desAlma = "PRINCIPAL")))
+        assertEquals("Toma N° 15 · Almacén 01 PRINCIPAL",
+            Inventario.titulo(InventarioDto(id = 3, numero = "15", coAlma = "01", desAlma = "PRINCIPAL")))
+    }
+
+    @Test
+    fun sumasExactasYBusqueda() {
+        assertEquals("8.5", Inventario.sumar(listOf("6", "2.5")))
+        assertEquals("0.3", Inventario.sumar(listOf("0.1", "0.2")))   // Con Double daría 0.30000000000000004
+        assertEquals("0", Inventario.sumar(listOf("1", "-1")))
+        assertEquals("%tubo%pvc%", Inventario.patronLike(" tubo*pvc "))
+        assertEquals("%50\\%\\_%", Inventario.patronLike("50%_"))
+        assertEquals("", Inventario.patronLike(""))
+        assertNotNull(Inventario.validarCantidad("0,0000001"))
     }
 
     @Test
     fun permisosDelAdministrador() {
         val p = PermisosDto(consultarArticulos = true, contarInventario = true)
         assertEquals("Consulta · Cuenta", Administracion.resumen(p))
+        assertEquals(NOMBRES_PERMISOS, Administracion.PERMISOS.map { it.first })
         assertEquals(Administracion.PERMISOS.map { it.first }, Administracion.mapa(p).keys.toList())
         assertEquals("Sincronizó artículos", Administracion.accion("SINCRONIZAR"))
         assertNull(Administracion.validarNuevo("ANA", "Ana", "secreta", "secreta"))

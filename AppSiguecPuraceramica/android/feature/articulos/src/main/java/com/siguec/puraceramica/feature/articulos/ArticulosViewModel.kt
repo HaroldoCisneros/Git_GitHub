@@ -4,14 +4,13 @@ package com.siguec.puraceramica.feature.articulos
 // ViewModel y sus corrutinas
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// Red: repositorios, DTO y resultado
+// Modelos, resultado y sesión (con la base del teléfono y la conexión a Profit)
 import com.siguec.puraceramica.core.red.ArticuloDto
 import com.siguec.puraceramica.core.red.Formato
 import com.siguec.puraceramica.core.red.InventarioDto
-import com.siguec.puraceramica.core.red.RepositorioArticulos
-import com.siguec.puraceramica.core.red.RepositorioInventarios
 import com.siguec.puraceramica.core.red.Resultado
 import com.siguec.puraceramica.core.red.SincronizacionDto
+import com.siguec.puraceramica.core.sesion.GestorSesion
 // Estado
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,27 +27,32 @@ data class EstadoArticulos(
     val hayMas: Boolean = false,
     val cargando: Boolean = false,
     val mensajeError: String? = null,               // No se pudo consultar
-    val inventarios: List<InventarioDto> = emptyList(), // Abiertos (para ver el stock contado)
+    val inventarios: List<InventarioDto> = emptyList(), // Del teléfono (para ver el stock contado)
     val inventarioId: Int? = null,                  // Inventario elegido (null = sin stock contado)
     val soloContados: Boolean = false,
-    val ultima: SincronizacionDto? = null,          // Última sincronización con Profit
+    val ultima: SincronizacionDto? = null,          // Última sincronización en este teléfono
     val sincronizando: Boolean = false,
     val aviso: String? = null                       // Mensaje abajo (resultado de sincronizar...)
 )
 
 /**
- * Lógica de "Artículos": consultar la copia sincronizada (código, descripción y
- * stock contado en el inventario elegido) y la acción de sincronizar con Profit.
+ * Lógica de "Artículos":
+ *  - Consultar la copia del TELÉFONO (sin WiFi): código, descripción y stock contado
+ *    en el inventario elegido.
+ *  - Sincronizar (con WiFi): baja saArticulo de Profit y reemplaza la copia del teléfono.
  *
- * @param repositorio artículos de la empresa elegida
- * @param inventarios para elegir de qué inventario abierto sale el stock contado
+ * @param gestor sesión: base del teléfono y conexión al SQL Server
+ * @param coEmpresa empresa elegida
  * @param inventarioInicial el último en que se contó (se propone al abrir)
  */
 class ArticulosViewModel(
-    private val repositorio: RepositorioArticulos,
-    private val inventarios: RepositorioInventarios,
+    private val gestor: GestorSesion,
+    private val coEmpresa: String,
     inventarioInicial: Int?
 ) : ViewModel() {
+
+    private val articulos = gestor.local.articulos
+    private val inventarios = gestor.local.inventarios
 
     private val _estado = MutableStateFlow(EstadoArticulos(inventarioId = inventarioInicial))
     val estado: StateFlow<EstadoArticulos> = _estado.asStateFlow()
@@ -60,16 +64,16 @@ class ArticulosViewModel(
         cargarDatos()
     }
 
-    /** Inventarios abiertos y la última sincronización; después la primera página. */
+    /** Inventarios del teléfono y la última sincronización; después la primera página. */
     private fun cargarDatos() {
         viewModelScope.launch {
-            val abiertos = (inventarios.lista(soloAbiertos = true) as? Resultado.Exito)?.valor.orEmpty()
-            val ultima = (repositorio.ultimaSincronizacion() as? Resultado.Exito)?.valor
+            val todos = inventarios.lista(coEmpresa)
+            val ultima = articulos.ultimaSincronizacion(coEmpresa)
             _estado.update { e ->
-                // Si el inventario propuesto ya no está abierto se toma el único abierto (o ninguno)
-                val elegido = e.inventarioId?.takeIf { id -> abiertos.any { it.id == id } }
-                    ?: abiertos.singleOrNull()?.id
-                e.copy(inventarios = abiertos, inventarioId = elegido, ultima = ultima)
+                // Si el inventario propuesto ya no está se toma el único abierto (o ninguno)
+                val elegido = e.inventarioId?.takeIf { id -> todos.any { it.id == id } }
+                    ?: todos.singleOrNull { it.abierto }?.id
+                e.copy(inventarios = todos, inventarioId = elegido, ultima = ultima)
             }
             buscar()
         }
@@ -91,12 +95,11 @@ class ArticulosViewModel(
         val e = _estado.value
         _estado.update { it.copy(cargando = true, mensajeError = null) }
         busqueda = viewModelScope.launch {
-            when (val r = repositorio.buscar(e.texto, e.inventarioId, e.soloContados, pagina)) {
-                is Resultado.Exito -> _estado.update {
-                    it.copy(cargando = false, pagina = pagina, hayMas = r.valor.hayMas,
-                        articulos = if (pagina == 1) r.valor.articulos else it.articulos + r.valor.articulos)
-                }
-                is Resultado.Error -> _estado.update { it.copy(cargando = false, mensajeError = r.mensaje) }
+            // En el teléfono: no necesita WiFi
+            val (encontrados, hayMas) = articulos.buscar(coEmpresa, e.texto, e.inventarioId, e.soloContados, pagina)
+            _estado.update {
+                it.copy(cargando = false, pagina = pagina, hayMas = hayMas,
+                    articulos = if (pagina == 1) encontrados else it.articulos + encontrados)
             }
         }
     }
@@ -120,18 +123,20 @@ class ArticulosViewModel(
 
     fun alFallarEscaner(mensaje: String) = _estado.update { it.copy(aviso = mensaje) }
 
-    /** Acción "Sincronizar con Profit": baja saArticulo a la copia de la App. */
+    /** Acción "Sincronizar con Profit" (necesita WiFi): baja saArticulo y reemplaza la copia del teléfono. */
     fun sincronizar() {
         if (_estado.value.sincronizando) return
+        val usuario = gestor.usuario ?: return
         _estado.update { it.copy(sincronizando = true) }
         viewModelScope.launch {
-            when (val r = repositorio.sincronizar()) {
+            when (val r = gestor.profit().leerArticulos(usuario, coEmpresa)) {
                 is Resultado.Exito -> {
-                    val s = r.valor
+                    articulos.guardarCopia(coEmpresa, r.valor, usuario.usuario, Formato.ahora())
+                    val s = articulos.ultimaSincronizacion(coEmpresa)
                     _estado.update {
                         it.copy(sincronizando = false, ultima = s,
-                            aviso = "Sincronizado: ${s.nuevos} nuevos, ${s.actualizados} actualizados, " +
-                                "${s.retirados} retirados (${Formato.cantidad(s.total.toDouble())} artículos)")
+                            aviso = "Sincronizado: ${Formato.cantidad(s?.total?.toDouble())} artículos y " +
+                                "${Formato.cantidad(s?.codigos?.toDouble())} códigos para escanear")
                     }
                     buscar()
                 }

@@ -1,8 +1,8 @@
 // =====================================================================
 // MÓDULO :feature:conteo
-// Contar: elegir el inventario ABIERTO del almacén y escanear los códigos de
-// barra. Cada conteo es individual (queda a nombre de quien cuenta) y se suma
-// al stock contado del artículo.
+// Contar SIN WiFi: elegir la toma física abierta (traída de Profit) y escanear
+// los códigos de barra. Cada conteo es individual (queda a nombre de quien
+// cuenta) y se guarda en el teléfono hasta que se envía a Profit.
 // =====================================================================
 
 plugins {
@@ -38,7 +38,7 @@ android {
 }
 
 dependencies {
-    // Repositorios, DTO y formatos (la red viene con la sesión)
+    // Sesión: base del teléfono, conexión al SQL Server, modelos y formatos
     implementation(project(":core:sesion"))
     // Tema visual, componentes y escáner de códigos
     implementation(project(":core:ui"))

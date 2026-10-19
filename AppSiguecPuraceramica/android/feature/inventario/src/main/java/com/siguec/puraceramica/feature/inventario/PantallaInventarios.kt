@@ -11,30 +11,25 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-// Listas y desplazamiento
+import androidx.compose.foundation.layout.size
+// Lista
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 // Iconos
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Refresh
 // Componentes de Material 3
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,42 +51,43 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-// Red y componentes compartidos
-import com.siguec.puraceramica.core.red.AlmacenDto
+// Modelos, sesión y componentes compartidos
 import com.siguec.puraceramica.core.red.Formato
 import com.siguec.puraceramica.core.red.Inventario
 import com.siguec.puraceramica.core.red.InventarioDto
-import com.siguec.puraceramica.core.red.RepositorioInventarios
+import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
 import com.siguec.puraceramica.core.ui.componentes.Cargando
-import com.siguec.puraceramica.core.ui.componentes.MensajeError
 import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
 
 /**
- * Pantalla "Inventarios por almacén" (permiso "preparar inventario").
- *  - Botón "Preparar inventario": se elige el almacén de Profit y se abre su
- *    inventario (el servidor toma la foto del stock de ese almacén).
- *  - Cada inventario: contar, ver las diferencias y cerrarlo.
+ * Pantalla "Inventarios" (tomas físicas de Profit en el teléfono).
+ *  - "Traer de Profit" (WiFi): baja las tomas físicas ABIERTAS en Profit.
+ *  - Cada toma: Contar (sin WiFi), Enviar a Profit (WiFi, permiso "cerrar") y,
+ *    ya enviada, quitarla del teléfono.
  *
- * @param almacenInicial almacén por defecto del ambiente del usuario
- * @param alContar abre la pantalla de contar en ese inventario
- * @param alComparar abre las diferencias (contado vs. stock)
+ * @param puedeTraer permiso "contar inventario"
+ * @param puedeEnviar permiso "cerrar inventario"
+ * @param alContar abre la pantalla de contar en esa toma
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class) // FlowRow
 @Composable
 fun PantallaInventarios(
-    repositorio: RepositorioInventarios,
+    gestor: GestorSesion,
+    coEmpresa: String,
     nombreEmpresa: String,
-    almacenInicial: String,
+    puedeTraer: Boolean,
+    puedeEnviar: Boolean,
     alContar: (Int) -> Unit,
-    alComparar: (Int) -> Unit,
     alVolver: () -> Unit
 ) {
-    val vm: InventariosViewModel = viewModel(factory = viewModelFactory { initializer { InventariosViewModel(repositorio) } })
+    val vm: InventariosViewModel = viewModel(
+        key = "inventarios-$coEmpresa",
+        factory = viewModelFactory { initializer { InventariosViewModel(gestor, coEmpresa) } })
     val estado by vm.estado.collectAsStateWithLifecycle()
     val avisos = remember { SnackbarHostState() }
-    var preparando by remember { mutableStateOf(false) }
-    var cerrando by remember { mutableStateOf<InventarioDto?>(null) }
+    var enviando by remember { mutableStateOf<InventarioDto?>(null) }
+    var quitando by remember { mutableStateOf<InventarioDto?>(null) }
 
     LaunchedEffect(estado.aviso) {
         estado.aviso?.let {
@@ -99,82 +95,92 @@ fun PantallaInventarios(
             vm.avisoMostrado()
         }
     }
+    // Al volver de contar se refresca el avance
+    LaunchedEffect(Unit) { vm.cargar() }
 
     Scaffold(
-        topBar = {
-            BarraSuperior(titulo = "Inventarios por almacén", subtitulo = nombreEmpresa, alVolver = alVolver,
-                acciones = {
-                    IconButton(onClick = vm::cargar) { Icon(Icons.Filled.Refresh, contentDescription = "Actualizar") }
-                })
-        },
+        topBar = { BarraSuperior(titulo = "Inventarios", subtitulo = nombreEmpresa, alVolver = alVolver) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { preparando = true },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Preparar inventario") }
-            )
+            if (puedeTraer) {
+                ExtendedFloatingActionButton(
+                    onClick = { if (!estado.trabajando) vm.traerDeProfit() },
+                    icon = {
+                        if (estado.trabajando) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Filled.CloudDownload, contentDescription = null)
+                    },
+                    text = { Text("Traer de Profit") }
+                )
+            }
         },
         snackbarHost = { SnackbarHost(avisos) }
     ) { margenes ->
         Box(Modifier.fillMaxSize().padding(margenes)) {
             when {
-                estado.cargando && estado.inventarios.isEmpty() -> Cargando()
-                estado.mensajeError != null -> MensajeError(estado.mensajeError.orEmpty(), alReintentar = vm::cargar)
-                estado.inventarios.isEmpty() ->
-                    MensajeVacio("No hay inventarios. Toque \"Preparar inventario\" y elija el almacén.")
+                estado.cargando -> Cargando()
+                estado.inventarios.isEmpty() -> MensajeVacio(
+                    "No hay inventarios en este teléfono. Con el WiFi de la empresa toque \"Traer de Profit\" " +
+                        "para bajar las tomas físicas abiertas.")
                 else -> LazyColumn(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(estado.inventarios, key = { it.id }) { inv ->
-                        TarjetaInventario(inv, alContar = { alContar(inv.id) }, alComparar = { alComparar(inv.id) },
-                            alCerrar = { cerrando = inv })
+                        TarjetaInventario(inv, puedeEnviar, trabajando = estado.trabajando,
+                            alContar = { alContar(inv.id) }, alEnviar = { enviando = inv }, alQuitar = { quitando = inv })
                     }
                 }
             }
         }
     }
 
-    if (preparando) {
-        DialogoPreparar(
-            almacenes = estado.almacenes,
-            almacenInicial = almacenInicial,
-            alPreparar = { coAlma, descripcion ->
-                preparando = false
-                vm.preparar(coAlma, descripcion)
+    enviando?.let { inv ->
+        AlertDialog(
+            onDismissRequest = { enviando = null },
+            title = { Text("Enviar a Profit") },
+            text = {
+                Text("Conéctese al WiFi de la empresa. Se envían a la toma física N° ${inv.numero} los ${inv.conteos} " +
+                    "conteos de este teléfono (${inv.articulosContados} artículos). Después ya no se podrá contar " +
+                    "aquí; la toma se cierra en Profit.")
             },
-            alCancelar = { preparando = false }
+            confirmButton = { TextButton(onClick = { enviando = null; vm.enviar(inv) }) { Text("Enviar") } },
+            dismissButton = { TextButton(onClick = { enviando = null }) { Text("Cancelar") } }
         )
     }
-    cerrando?.let { inv ->
+    quitando?.let { inv ->
         AlertDialog(
-            onDismissRequest = { cerrando = null },
-            title = { Text("Cerrar inventario N° ${inv.id}") },
-            text = { Text("Ya no se podrá contar en el almacén ${inv.coAlma}. Las diferencias se podrán seguir viendo.") },
-            confirmButton = { TextButton(onClick = { cerrando = null; vm.cerrar(inv) }) { Text("Cerrar inventario") } },
-            dismissButton = { TextButton(onClick = { cerrando = null }) { Text("Cancelar") } }
+            onDismissRequest = { quitando = null },
+            title = { Text("Quitar del teléfono") },
+            text = { Text("La toma N° ${inv.numero} ya se envió a Profit. ¿Quitarla de este teléfono con sus conteos?") },
+            confirmButton = { TextButton(onClick = { quitando = null; vm.borrarEnviado(inv) }) { Text("Quitar") } },
+            dismissButton = { TextButton(onClick = { quitando = null }) { Text("Cancelar") } }
         )
     }
 }
 
-/** Un inventario: almacén, estado, avance y sus botones. */
+/** Una toma: almacén, estado, avance y sus botones. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TarjetaInventario(inv: InventarioDto, alContar: () -> Unit, alComparar: () -> Unit, alCerrar: () -> Unit) {
+private fun TarjetaInventario(
+    inv: InventarioDto,
+    puedeEnviar: Boolean,
+    trabajando: Boolean,
+    alContar: () -> Unit,
+    alEnviar: () -> Unit,
+    alQuitar: () -> Unit
+) {
     Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(
         containerColor = if (inv.abierto) MaterialTheme.colorScheme.primaryContainer
         else MaterialTheme.colorScheme.surfaceVariant)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(Inventario.titulo(inv), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(inv.descripcion, style = MaterialTheme.typography.bodyMedium)
-            Text("Preparado por ${inv.creadoPor}" + (inv.fechaCreacion?.let { " el " + Formato.fecha(it) } ?: ""),
+            if (inv.descripcion.isNotBlank()) Text(inv.descripcion, style = MaterialTheme.typography.bodyMedium)
+            inv.fecha?.let { Text("Abierta en Profit el ${Formato.fecha(it)}", style = MaterialTheme.typography.bodySmall) }
+            Text("En este teléfono: ${inv.articulosContados} artículos contados · ${inv.conteos} conteos",
                 style = MaterialTheme.typography.bodySmall)
             if (!inv.abierto) {
-                Text("CERRADO por ${inv.cerradoPor}" + (inv.fechaCierre?.let { " el " + Formato.fecha(it) } ?: ""),
+                Text("ENVIADA a Profit por ${inv.enviadoPor}" + (inv.fechaEnvio?.let { " el " + Formato.fecha(it) } ?: ""),
                     style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
-            Text("${inv.articulosContados} de ${inv.articulosStock} artículos con stock contados · ${inv.conteos} conteos",
-                style = MaterialTheme.typography.bodySmall)
             // FlowRow: si los botones no caben en una fila, bajan a la siguiente
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (inv.abierto) {
@@ -182,67 +188,19 @@ private fun TarjetaInventario(inv: InventarioDto, alContar: () -> Unit, alCompar
                         Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
                         Text(" Contar")
                     }
-                }
-                OutlinedButton(onClick = alComparar) {
-                    Icon(Icons.Filled.Assessment, contentDescription = null)
-                    Text(" Diferencias")
-                }
-                if (inv.abierto) {
-                    OutlinedButton(onClick = alCerrar) {
-                        Icon(Icons.Filled.Lock, contentDescription = null)
-                        Text(" Cerrar")
+                    if (puedeEnviar) {
+                        OutlinedButton(onClick = alEnviar, enabled = !trabajando && inv.conteos > 0) {
+                            Icon(Icons.Filled.CloudUpload, contentDescription = null)
+                            Text(" Enviar a Profit")
+                        }
+                    }
+                } else {
+                    OutlinedButton(onClick = alQuitar) {
+                        Icon(Icons.Filled.Delete, contentDescription = null)
+                        Text(" Quitar del teléfono")
                     }
                 }
             }
         }
     }
-}
-
-/**
- * Elegir el almacén (de Profit) y preparar su inventario. Los almacenes que ya
- * tienen uno abierto se muestran pero no se pueden elegir.
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
-@Composable
-private fun DialogoPreparar(
-    almacenes: List<AlmacenDto>,
-    almacenInicial: String,
-    alPreparar: (String, String) -> Unit,
-    alCancelar: () -> Unit
-) {
-    val libres = almacenes.filter { it.inventarioAbierto == null }
-    var elegido by remember { mutableStateOf(libres.firstOrNull { it.coAlma == almacenInicial }?.coAlma.orEmpty()) }
-    var descripcion by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = alCancelar,
-        title = { Text("Preparar inventario") },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Elija el almacén. Se toma la foto del stock de Profit de ese almacén para comparar al final.",
-                    style = MaterialTheme.typography.bodySmall)
-                if (almacenes.isEmpty()) {
-                    Text("No se pudieron leer los almacenes de Profit.", color = MaterialTheme.colorScheme.error)
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    almacenes.forEach { a ->
-                        val libre = a.inventarioAbierto == null
-                        FilterChip(
-                            selected = elegido == a.coAlma,
-                            onClick = { elegido = a.coAlma },
-                            enabled = libre,
-                            label = {
-                                Text("${a.coAlma} ${a.desAlma}".trim() + if (libre) "" else " (abierto N° ${a.inventarioAbierto})")
-                            }
-                        )
-                    }
-                }
-                OutlinedTextField(descripcion, { if (it.length <= 100) descripcion = it }, singleLine = true,
-                    label = { Text("Descripción (opcional)") }, modifier = Modifier.fillMaxWidth())
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { alPreparar(elegido, descripcion) }, enabled = elegido.isNotEmpty()) { Text("Preparar") }
-        },
-        dismissButton = { TextButton(onClick = alCancelar) { Text("Cancelar") } }
-    )
 }

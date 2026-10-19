@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 // Piezas de la red y de la sesión
 import com.siguec.puraceramica.core.red.AmbienteDto
 import com.siguec.puraceramica.core.red.Resultado
-import com.siguec.puraceramica.core.red.TipoError
 import com.siguec.puraceramica.core.sesion.GestorSesion
 // Estado observable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +19,7 @@ import kotlinx.coroutines.launch
 
 /** En qué parte de la entrada está el usuario. */
 enum class PasoLogin {
-    INICIANDO,    // Revisando si el token guardado sigue vigente
-    CREDENCIALES, // Escribiendo servidor, usuario y clave
+    CREDENCIALES, // Escribiendo usuario y clave
     EMPRESA       // Eligiendo la empresa (tiene acceso a varias)
 }
 
@@ -30,14 +28,14 @@ enum class PasoLogin {
  * Cada cambio crea una copia nueva y la pantalla se redibuja.
  */
 data class EstadoLogin(
-    val paso: PasoLogin = PasoLogin.INICIANDO,
-    val servidor: String = "",              // Dirección del servidor
-    val verServidor: Boolean = false,       // true = se muestra el campo del servidor
+    val paso: PasoLogin = PasoLogin.CREDENCIALES,
+    val servidor: String = "",              // Servidor configurado (solo se muestra)
+    val sinConfigurar: Boolean = false,     // true = hay que llenar Configuración primero
     val usuario: String = "",
     val clave: String = "",
-    val cargando: Boolean = false,          // true = esperando al servidor
+    val cargando: Boolean = false,          // true = verificando la clave
     val mensajeError: String? = null,       // Error en rojo
-    val mensajeAviso: String? = null,       // Aviso (sesión vencida, servidor probado...)
+    val mensajeAviso: String? = null,       // Aviso (entró sin WiFi...)
     val ambientes: List<AmbienteDto> = emptyList(), // Empresas para elegir
     val listo: Boolean = false              // true = ya entró y tiene empresa: ir al menú
 )
@@ -48,100 +46,53 @@ data class EstadoLogin(
  */
 class LoginViewModel(private val gestor: GestorSesion) : ViewModel() {
 
-    private val _estado = MutableStateFlow(
-        EstadoLogin(
-            servidor = gestor.urlServidor,
-            usuario = gestor.ultimoUsuario,
-            // La primera vez no hay servidor guardado: se muestra el campo
-            verServidor = gestor.urlServidor.isBlank()
-        )
-    )
+    private val _estado = MutableStateFlow(EstadoLogin(usuario = gestor.ultimoUsuario))
     val estado: StateFlow<EstadoLogin> = _estado.asStateFlow()
 
     init {
-        // Si se llegó aquí porque el servidor rechazó el token, se avisa
-        if (gestor.sesionVencida.value) {
-            _estado.update { it.copy(mensajeAviso = "Su sesión venció. Entre de nuevo con su clave.") }
-            gestor.avisoVencidaMostrado()
-        }
-        restaurar()
+        // Si quedó una sesión abierta (aunque no haya WiFi) se entra directo
+        if (gestor.restaurar() != null) despuesDeEntrar() else alVolverDeConfiguracion()
     }
 
-    /** Si hay token guardado y sigue vigente, entra sin pedir la clave. */
-    private fun restaurar() {
-        viewModelScope.launch {
-            when (val r = gestor.restaurar()) {
-                null -> _estado.update { it.copy(paso = PasoLogin.CREDENCIALES) } // No había sesión
-                is Resultado.Exito -> despuesDeEntrar()
-                is Resultado.Error -> _estado.update {
-                    it.copy(
-                        paso = PasoLogin.CREDENCIALES,
-                        // Sin internet se explica; si el token venció, solo se pide la clave
-                        mensajeError = if (r.tipo == TipoError.RED) r.mensaje else null
-                    )
-                }
-            }
-        }
+    /** Al abrir la pantalla o volver de Configuración: se refresca el servidor configurado. */
+    fun alVolverDeConfiguracion() = _estado.update {
+        it.copy(servidor = gestor.conexion.servidor, sinConfigurar = !gestor.conexionConfigurada)
     }
 
     // ---------- Lo que escribe el usuario ----------
-
-    fun alCambiarServidor(texto: String) =
-        _estado.update { it.copy(servidor = texto.trim(), mensajeError = null, mensajeAviso = null) }
 
     fun alCambiarUsuario(texto: String) =
         _estado.update { it.copy(usuario = texto.trim().uppercase(), mensajeError = null) }
 
     fun alCambiarClave(texto: String) = _estado.update { it.copy(clave = texto, mensajeError = null) }
 
-    fun alternarServidor() = _estado.update { it.copy(verServidor = !it.verServidor) }
-
     // ---------- Botones ----------
-
-    /** Botón "Probar": ¿responde el servidor en esa dirección? */
-    fun probarServidor() {
-        val servidor = _estado.value.servidor
-        if (servidor.isBlank()) {
-            _estado.update { it.copy(mensajeError = "Escriba la dirección del servidor") }
-            return
-        }
-        _estado.update { it.copy(cargando = true, mensajeError = null, mensajeAviso = null) }
-        viewModelScope.launch {
-            val r = gestor.probarServidor(servidor)
-            _estado.update {
-                when (r) {
-                    is Resultado.Exito -> it.copy(cargando = false,
-                        mensajeAviso = "Conexión correcta con ${r.valor.aplicacion} ${r.valor.version}")
-                    is Resultado.Error -> it.copy(cargando = false, mensajeError = r.mensaje)
-                }
-            }
-        }
-    }
 
     /** Botón "Entrar". */
     fun entrar() {
         val actual = _estado.value
         val error = when {
-            actual.servidor.isBlank() -> "Escriba la dirección del servidor"
+            actual.sinConfigurar -> "Primero configure la conexión con el servidor (botón Configuración)"
             actual.usuario.isBlank() -> "Escriba su usuario"
             actual.clave.isEmpty() -> "Escriba su clave"
             else -> null
         }
         if (error != null) {
-            _estado.update { it.copy(mensajeError = error, verServidor = it.verServidor || it.servidor.isBlank()) }
+            _estado.update { it.copy(mensajeError = error) }
             return
         }
         _estado.update { it.copy(cargando = true, mensajeError = null, mensajeAviso = null) }
         viewModelScope.launch {
-            when (val r = gestor.entrar(actual.servidor, actual.usuario, actual.clave)) {
+            when (val r = gestor.entrar(actual.usuario, actual.clave)) {
                 is Resultado.Exito -> {
                     // La clave no se queda en memoria
-                    _estado.update { it.copy(clave = "") }
+                    _estado.update {
+                        it.copy(clave = "", mensajeAviso = if (r.valor.sinConexion)
+                            "Entró sin WiFi: puede contar; para sincronizar o enviar necesita el WiFi." else null)
+                    }
                     despuesDeEntrar()
                 }
-                is Resultado.Error -> _estado.update {
-                    it.copy(cargando = false, clave = "", mensajeError = r.mensaje)
-                }
+                is Resultado.Error -> _estado.update { it.copy(cargando = false, clave = "", mensajeError = r.mensaje) }
             }
         }
     }
@@ -166,7 +117,7 @@ class LoginViewModel(private val gestor: GestorSesion) : ViewModel() {
 
     /** "Otro usuario" en el paso de elegir empresa: vuelve a pedir usuario y clave. */
     fun volverACredenciales() {
-        viewModelScope.launch { gestor.salir() }
+        gestor.salir()
         _estado.update { it.copy(paso = PasoLogin.CREDENCIALES, ambientes = emptyList()) }
     }
 }

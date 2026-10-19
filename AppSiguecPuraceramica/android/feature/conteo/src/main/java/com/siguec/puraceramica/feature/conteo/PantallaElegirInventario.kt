@@ -47,15 +47,15 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 // Red y componentes compartidos
 import com.siguec.puraceramica.core.red.Inventario
-import com.siguec.puraceramica.core.red.RepositorioInventarios
+import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
 import com.siguec.puraceramica.core.ui.componentes.Cargando
-import com.siguec.puraceramica.core.ui.componentes.MensajeError
 import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
 
 /**
- * "¿En qué inventario va a contar?": la lista de inventarios ABIERTOS (uno por
- * almacén). Si hay uno solo se entra directo.
+ * "¿En qué inventario va a contar?": las tomas físicas ABIERTAS guardadas en el
+ * teléfono (traídas de Profit en "Inventarios"). Si hay una sola se entra directo.
+ * Funciona sin WiFi.
  *
  * @param ultimo el último en que contó este teléfono (se marca con ✓)
  * @param alElegir abre la pantalla de contar en ese inventario
@@ -63,7 +63,8 @@ import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
  */
 @Composable
 fun PantallaElegirInventario(
-    repositorio: RepositorioInventarios,
+    gestor: GestorSesion,
+    coEmpresa: String,
     nombreEmpresa: String,
     ultimo: Int?,
     directo: Boolean,
@@ -71,7 +72,8 @@ fun PantallaElegirInventario(
     alVolver: () -> Unit
 ) {
     val vm: ElegirInventarioViewModel = viewModel(
-        factory = viewModelFactory { initializer { ElegirInventarioViewModel(repositorio) } })
+        key = "elegir-$coEmpresa",
+        factory = viewModelFactory { initializer { ElegirInventarioViewModel(gestor.local.inventarios, coEmpresa) } })
     val estado by vm.estado.collectAsStateWithLifecycle()
 
     // Un solo inventario abierto: se entra directo, UNA vez (al volver con la flecha
@@ -96,9 +98,9 @@ fun PantallaElegirInventario(
         Box(Modifier.fillMaxSize().padding(margenes)) {
             when {
                 estado.cargando -> Cargando()
-                estado.mensajeError != null -> MensajeError(estado.mensajeError.orEmpty(), alReintentar = vm::cargar)
                 estado.abiertos.isEmpty() -> MensajeVacio(
-                    "No hay inventarios abiertos. Quien prepara el inventario debe abrir el del almacén.")
+                    "No hay tomas físicas en este teléfono. Vaya a Inventarios y, con el WiFi de la empresa, " +
+                        "toque \"Traer de Profit\".")
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(estado.abiertos, key = { it.id }) { inv ->
                         Card(Modifier.fillMaxWidth().clickable { alElegir(inv.id) }) {
@@ -109,7 +111,7 @@ fun PantallaElegirInventario(
                                 Column(Modifier.weight(1f)) {
                                     Text(Inventario.titulo(inv), style = MaterialTheme.typography.titleMedium)
                                     Text(inv.descripcion, style = MaterialTheme.typography.bodySmall)
-                                    Text("${inv.articulosContados} artículos contados · ${inv.conteos} conteos",
+                                    Text("En este teléfono: ${inv.articulosContados} artículos · ${inv.conteos} conteos",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }

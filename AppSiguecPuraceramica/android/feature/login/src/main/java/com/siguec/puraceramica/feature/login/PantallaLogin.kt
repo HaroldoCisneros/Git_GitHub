@@ -23,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 // Iconos
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -68,22 +67,24 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 // Sesión y componentes compartidos
 import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
-import com.siguec.puraceramica.core.ui.componentes.Cargando
 import com.siguec.puraceramica.core.ui.componentes.LogoSiguec
 import com.siguec.puraceramica.core.ui.tema.ColoresMarca
 
 /**
  * Pantalla de entrada de AppSiguecPuraceramica.
- *  1. Al abrir: si el token guardado sigue vigente, entra sola.
- *  2. Si no: pide servidor (solo la primera vez), usuario y clave.
+ *  1. Al abrir: si quedó una sesión abierta, entra sola (aunque no haya WiFi).
+ *  2. Si no: pide usuario y clave. Con WiFi se verifica en el SQL Server; sin WiFi,
+ *     con la clave de la última vez que ese usuario entró en este teléfono.
  *  3. Si el usuario tiene varias empresas: las muestra para elegir.
+ *  El botón Configuración (arriba y abajo) cambia los datos de la conexión.
  *
  * @param gestor dueño de la sesión (para crear el ViewModel)
  * @param alEntrar ya entró y eligió empresa: ir al menú
+ * @param alConfigurar abre la Configuración de la conexión
  * @param alSalir ícono "Salir": cierra la App
  */
 @Composable
-fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alSalir: () -> Unit) {
+fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alConfigurar: () -> Unit, alSalir: () -> Unit) {
     // Creamos (o recuperamos) el ViewModel pasándole el gestor
     val vm: LoginViewModel = viewModel(factory = viewModelFactory { initializer { LoginViewModel(gestor) } })
     // Cada cambio de estado redibuja la pantalla
@@ -91,12 +92,18 @@ fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alSalir: () -> Uni
 
     // Cuando ya está listo, vamos al menú
     LaunchedEffect(estado.listo) { if (estado.listo) alEntrar() }
+    // Al volver de Configuración se refresca el servidor que se muestra
+    LaunchedEffect(Unit) { vm.alVolverDeConfiguracion() }
 
     Scaffold(
         topBar = {
             BarraSuperior(
                 titulo = if (estado.paso == PasoLogin.EMPRESA) "Elija la empresa" else "AppSiguecPuraceramica",
                 acciones = {
+                    // Configuración: datos de la conexión con el SQL Server
+                    IconButton(onClick = alConfigurar) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Configuración")
+                    }
                     IconButton(onClick = alSalir) {
                         Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Salir de la app")
                     }
@@ -106,7 +113,6 @@ fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alSalir: () -> Uni
     ) { margenes ->
         // "when" = según el paso se dibuja una cosa u otra
         when (estado.paso) {
-            PasoLogin.INICIANDO -> Cargando("Conectando...", Modifier.padding(margenes))
             PasoLogin.EMPRESA -> Column(Modifier.fillMaxSize().padding(margenes).padding(16.dp)) {
                 Text("Hola, ${estado.usuario}. ¿Con qué empresa va a trabajar?",
                     style = MaterialTheme.typography.titleMedium)
@@ -117,14 +123,14 @@ fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alSalir: () -> Uni
                     Text("Entrar con otro usuario")
                 }
             }
-            PasoLogin.CREDENCIALES -> Credenciales(estado, vm, Modifier.padding(margenes))
+            PasoLogin.CREDENCIALES -> Credenciales(estado, vm, alConfigurar, Modifier.padding(margenes))
         }
     }
 }
 
-/** Formulario de servidor, usuario y clave. */
+/** Formulario de usuario y clave, y el botón de Configuración de la conexión. */
 @Composable
-private fun Credenciales(estado: EstadoLogin, vm: LoginViewModel, modifier: Modifier) {
+private fun Credenciales(estado: EstadoLogin, vm: LoginViewModel, alConfigurar: () -> Unit, modifier: Modifier) {
     // Controlador del foco (saltar de campo y cerrar el teclado)
     val foco = LocalFocusManager.current
     // ¿Se muestra la clave? (sobrevive a girar el teléfono)
@@ -145,24 +151,11 @@ private fun Credenciales(estado: EstadoLogin, vm: LoginViewModel, modifier: Modi
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(28.dp))
 
-        // ---------- Servidor (se oculta cuando ya está guardado) ----------
-        if (estado.verServidor) {
-            OutlinedTextField(
-                value = estado.servidor,
-                onValueChange = vm::alCambiarServidor,
-                label = { Text("Dirección del servidor") },
-                placeholder = { Text("siguec.miempresa.com") },
-                leadingIcon = { Icon(Icons.Filled.Dns, contentDescription = null) },
-                singleLine = true,
-                enabled = !estado.cargando,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { foco.moveFocus(FocusDirection.Down) }),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = vm::probarServidor, enabled = !estado.cargando) { Text("Probar conexión") }
-            }
-            Spacer(Modifier.height(4.dp))
+        // ---------- Sin configurar: lo primero es la conexión ----------
+        if (estado.sinConfigurar) {
+            Text("Antes de entrar, configure la conexión con el servidor SQL de la empresa.",
+                color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
         }
 
         // ---------- Usuario ----------
@@ -231,14 +224,12 @@ private fun Credenciales(estado: EstadoLogin, vm: LoginViewModel, modifier: Modi
             }
         }
 
-        // Para cambiar de servidor cuando ya está guardado
-        if (!estado.verServidor) {
-            Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = vm::alternarServidor, enabled = !estado.cargando) {
-                Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Servidor: ${estado.servidor}")
-            }
+        // ---------- Configuración de la conexión (siempre a la vista) ----------
+        Spacer(Modifier.height(12.dp))
+        OutlinedButton(onClick = alConfigurar, enabled = !estado.cargando) {
+            Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(if (estado.sinConfigurar) "Configuración" else "Configuración · ${estado.servidor}")
         }
     }
 }

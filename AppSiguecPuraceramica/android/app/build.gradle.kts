@@ -30,17 +30,9 @@ android {
     }
 
     buildTypes {
-        // "debug" = la que se instala desde Android Studio para probar.
-        // Permite "http://" para probar con el servidor en la red local
-        // (ej. http://192.168.1.10:8000) sin certificado.
-        debug {
-            manifestPlaceholders["permitirHttp"] = "true"
-        }
-        // "release" = la que se entrega a los usuarios: SOLO "https://"
-        // (la clave y los datos viajan cifrados por internet).
+        // "release" = la que se entrega a los usuarios
         release {
             isMinifyEnabled = false
-            manifestPlaceholders["permitirHttp"] = "false"
         }
     }
 

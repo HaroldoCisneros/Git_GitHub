@@ -1,8 +1,8 @@
 // =====================================================================
 // MÓDULO :feature:inventario
-// Inventarios por almacén (quien tiene el permiso "preparar inventario"):
-//   - Preparar (abrir) el inventario de un almacén: toma la foto del stock de Profit.
-//   - Ver las diferencias (contado vs. stock) y cerrar el inventario.
+// Inventarios (tomas físicas de Profit 2K12) en el teléfono:
+//   - Traer de Profit (WiFi) las tomas físicas ABIERTAS para contar sin WiFi.
+//   - Enviar a Profit (WiFi) lo contado; Profit se encarga de cerrarla.
 // =====================================================================
 
 plugins {
@@ -38,7 +38,7 @@ android {
 }
 
 dependencies {
-    // Repositorios, DTO y formatos (la red viene con la sesión)
+    // Sesión: base del teléfono, conexión al SQL Server, modelos y formatos
     implementation(project(":core:sesion"))
     // Tema visual, componentes y escáner de códigos
     implementation(project(":core:ui"))

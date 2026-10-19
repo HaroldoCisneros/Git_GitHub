@@ -4,10 +4,9 @@ package com.siguec.puraceramica.feature.conteo
 // ViewModel y sus corrutinas
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// Red
+// Modelos y base del teléfono
+import com.siguec.puraceramica.core.local.InventariosLocales
 import com.siguec.puraceramica.core.red.InventarioDto
-import com.siguec.puraceramica.core.red.RepositorioInventarios
-import com.siguec.puraceramica.core.red.Resultado
 // Estado
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,12 +17,11 @@ import kotlinx.coroutines.launch
 /** Estado de "¿En qué inventario va a contar?". */
 data class EstadoElegirInventario(
     val abiertos: List<InventarioDto> = emptyList(),
-    val cargando: Boolean = true,
-    val mensajeError: String? = null
+    val cargando: Boolean = true
 )
 
-/** Trae los inventarios ABIERTOS de la empresa: solo en esos se puede contar. */
-class ElegirInventarioViewModel(private val repositorio: RepositorioInventarios) : ViewModel() {
+/** Las tomas ABIERTAS guardadas en el teléfono (traídas de Profit): solo en esas se cuenta. Sin WiFi. */
+class ElegirInventarioViewModel(private val local: InventariosLocales, private val coEmpresa: String) : ViewModel() {
 
     private val _estado = MutableStateFlow(EstadoElegirInventario())
     val estado: StateFlow<EstadoElegirInventario> = _estado.asStateFlow()
@@ -33,12 +31,9 @@ class ElegirInventarioViewModel(private val repositorio: RepositorioInventarios)
     }
 
     fun cargar() {
-        _estado.update { it.copy(cargando = true, mensajeError = null) }
         viewModelScope.launch {
-            when (val r = repositorio.lista(soloAbiertos = true)) {
-                is Resultado.Exito -> _estado.update { it.copy(cargando = false, abiertos = r.valor) }
-                is Resultado.Error -> _estado.update { it.copy(cargando = false, mensajeError = r.mensaje) }
-            }
+            val abiertos = local.lista(coEmpresa, soloAbiertos = true)
+            _estado.update { it.copy(cargando = false, abiertos = abiertos) }
         }
     }
 }

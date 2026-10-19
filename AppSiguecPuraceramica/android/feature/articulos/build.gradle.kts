@@ -1,8 +1,8 @@
 // =====================================================================
 // MÓDULO :feature:articulos
-// Artículos de la copia sincronizada con Profit 2K12 (saArticulo):
-//   - Consultar: SOLO código, descripción y stock contado (si lo hay).
-//   - Sincronizar: bajar los artículos de Profit a la base de la App.
+// Artículos en el teléfono (copia de saArticulo de Profit 2K12):
+//   - Consultar (sin WiFi): SOLO código, descripción y stock contado (si lo hay).
+//   - Sincronizar (con WiFi): bajar los artículos de Profit al teléfono.
 // =====================================================================
 
 plugins {
@@ -38,7 +38,7 @@ android {
 }
 
 dependencies {
-    // Repositorios, DTO y formatos (la red viene con la sesión)
+    // Sesión: base del teléfono, conexión al SQL Server, modelos y formatos
     implementation(project(":core:sesion"))
     // Tema visual, componentes y escáner de códigos
     implementation(project(":core:ui"))

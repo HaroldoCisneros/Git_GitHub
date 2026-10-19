@@ -4,11 +4,10 @@ package com.siguec.puraceramica.feature.inventario
 // ViewModel y sus corrutinas
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// Red
-import com.siguec.puraceramica.core.red.AlmacenDto
+// Modelos, resultado y sesión
 import com.siguec.puraceramica.core.red.InventarioDto
-import com.siguec.puraceramica.core.red.RepositorioInventarios
 import com.siguec.puraceramica.core.red.Resultado
+import com.siguec.puraceramica.core.sesion.GestorSesion
 // Estado
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,21 +15,27 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Estado de la pantalla de inventarios por almacén. */
+/** Estado de la pantalla de inventarios. */
 data class EstadoInventarios(
-    val inventarios: List<InventarioDto> = emptyList(),
-    val almacenes: List<AlmacenDto> = emptyList(),   // Para preparar uno nuevo
+    val inventarios: List<InventarioDto> = emptyList(), // Los del teléfono
     val cargando: Boolean = true,
-    val mensajeError: String? = null,
-    val trabajando: Boolean = false,                 // Preparando o cerrando
+    val trabajando: Boolean = false,                    // Trayendo o enviando (con WiFi)
     val aviso: String? = null
 )
 
 /**
- * Lógica de "Inventarios por almacén": lista, preparar (abrir) el inventario de
- * un almacén con la foto del stock de Profit, y cerrarlo.
+ * Lógica de "Inventarios":
+ *  - Lista: las tomas físicas guardadas en el TELÉFONO (sin WiFi).
+ *  - Traer de Profit (WiFi): las tomas físicas ABIERTAS en Profit se guardan en el teléfono.
+ *  - Enviar a Profit (WiFi): lo contado en el teléfono va a la toma física de Profit
+ *    (Profit la cierra) y aquí queda cerrada.
+ *
+ * @param gestor sesión: base del teléfono y conexión al SQL Server
+ * @param coEmpresa empresa elegida
  */
-class InventariosViewModel(private val repositorio: RepositorioInventarios) : ViewModel() {
+class InventariosViewModel(private val gestor: GestorSesion, private val coEmpresa: String) : ViewModel() {
+
+    private val local = gestor.local.inventarios
 
     private val _estado = MutableStateFlow(EstadoInventarios())
     val estado: StateFlow<EstadoInventarios> = _estado.asStateFlow()
@@ -39,55 +44,71 @@ class InventariosViewModel(private val repositorio: RepositorioInventarios) : Vi
         cargar()
     }
 
-    /** Inventarios y almacenes de Profit. */
+    /** Los inventarios del teléfono. */
     fun cargar() {
-        _estado.update { it.copy(cargando = true, mensajeError = null) }
         viewModelScope.launch {
-            val lista = repositorio.lista()
-            val almacenes = (repositorio.almacenes() as? Resultado.Exito)?.valor.orEmpty()
-            _estado.update {
-                when (lista) {
-                    is Resultado.Exito -> it.copy(cargando = false, inventarios = lista.valor, almacenes = almacenes)
-                    is Resultado.Error -> it.copy(cargando = false, mensajeError = lista.mensaje)
+            val lista = local.lista(coEmpresa)
+            _estado.update { it.copy(cargando = false, inventarios = lista) }
+        }
+    }
+
+    /** "Traer de Profit": guarda en el teléfono las tomas físicas abiertas en Profit. */
+    fun traerDeProfit() {
+        val usuario = gestor.usuario ?: return
+        if (_estado.value.trabajando) return
+        _estado.update { it.copy(trabajando = true) }
+        viewModelScope.launch {
+            val repositorio = gestor.inventarioProfit()
+            when (val r = repositorio.traerAbiertas(usuario, coEmpresa)) {
+                is Resultado.Exito -> {
+                    val nuevas = local.guardarTomas(coEmpresa, r.valor)
+                    // La bitácora solo de las que se trajeron ahora
+                    val yaEstaban = _estado.value.inventarios.map { it.numero }.toSet()
+                    r.valor.filter { it.numero !in yaEstaban }.forEach { repositorio.anotarTraida(usuario, coEmpresa, it) }
+                    _estado.update {
+                        it.copy(trabajando = false, aviso = when {
+                            r.valor.isEmpty() -> "No hay tomas físicas abiertas en Profit."
+                            nuevas == 0 -> "Ya tenía todas las tomas abiertas (${r.valor.size})."
+                            else -> "Se trajeron $nuevas tomas físicas abiertas de Profit."
+                        })
+                    }
+                    cargar()
                 }
+                is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
             }
         }
     }
 
     /**
-     * Prepara el inventario del almacén.
-     * @param alListo se llama con el inventario nuevo (para empezar a contar de una vez)
+     * "Enviar a Profit": manda TODOS los conteos de este teléfono en esa toma.
+     * Si se corta el WiFi a mitad, se puede volver a intentar: no se duplica.
      */
-    fun preparar(coAlma: String, descripcion: String, alListo: (InventarioDto) -> Unit = {}) {
+    fun enviar(inventario: InventarioDto) {
+        val usuario = gestor.usuario ?: return
         if (_estado.value.trabajando) return
         _estado.update { it.copy(trabajando = true) }
         viewModelScope.launch {
-            when (val r = repositorio.preparar(coAlma, descripcion)) {
+            val (renglones, clave) = local.paraEnviar(inventario.id)
+            when (val r = gestor.inventarioProfit().enviar(usuario, coEmpresa, inventario, renglones, clave)) {
                 is Resultado.Exito -> {
+                    local.marcarEnviado(inventario.id, usuario.usuario)
+                    if (gestor.ultimoInventario() == inventario.id) gestor.recordarInventario(null)
                     _estado.update {
-                        it.copy(trabajando = false, aviso = "Inventario N° ${r.valor.id} preparado: " +
-                            "${r.valor.articulosStock} artículos con stock en el almacén ${r.valor.coAlma}")
+                        it.copy(trabajando = false, aviso = "Toma ${inventario.numero} enviada a Profit: " +
+                            "${r.valor.articulos} artículos, ${r.valor.conteos} conteos. Ciérrela en Profit.")
                     }
                     cargar()
-                    alListo(r.valor)
                 }
                 is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
             }
         }
     }
 
-    /** Cierra el inventario: ya no se puede contar. */
-    fun cerrar(inventario: InventarioDto) {
-        if (_estado.value.trabajando) return
-        _estado.update { it.copy(trabajando = true) }
+    /** Quita del teléfono una toma ya enviada (para no acumular). */
+    fun borrarEnviado(inventario: InventarioDto) {
         viewModelScope.launch {
-            when (val r = repositorio.cerrar(inventario.id)) {
-                is Resultado.Exito -> {
-                    _estado.update { it.copy(trabajando = false, aviso = "Inventario N° ${inventario.id} cerrado") }
-                    cargar()
-                }
-                is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
-            }
+            local.borrarEnviado(inventario.id)
+            cargar()
         }
     }
 

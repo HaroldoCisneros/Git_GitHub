@@ -6,7 +6,7 @@
      ================================================================ -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permiso para conectarse por internet con el servidor de AppSiguecPuraceramica -->
+    <!-- Permiso de red: la App se conecta directo al SQL Server por el WiFi de la empresa -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -16,12 +16,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="${permitirHttp}"
         android:theme="@style/Theme.AppSiguecPuraceramica">
         <!-- name: clase que arranca primero (crea la sesión)                     -->
-        <!-- allowBackup=false: el token de la sesión no se copia a la nube        -->
-        <!-- usesCleartextTraffic: "http://" solo en la versión de prueba (debug); -->
-        <!--   la versión para los usuarios (release) exige "https://"             -->
+        <!-- allowBackup=false: los datos de conexión (clave de SQL) y los conteos  -->
+        <!--   guardados en el teléfono NO se copian a la nube                     -->
 
         <!-- Escáner de códigos de Google: que Play Services lo descargue al instalar la App
              (si no, se descarga la primera vez que se toca "Escanear" y tarda un poco) -->

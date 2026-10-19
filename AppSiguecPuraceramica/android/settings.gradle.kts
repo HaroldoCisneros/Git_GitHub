@@ -34,14 +34,15 @@ rootProject.name = "AppSiguecPuraceramica"
 include(":app")
 
 // Módulos "core" (núcleo): piezas compartidas
-include(":core:red")    // Comunicación con la API del servidor (Kotlin puro, sin Android)
-include(":core:sesion") // Sesión del usuario: servidor, token y empresa elegida
+include(":core:red")    // Conexión DIRECTA al SQL Server por el WiFi (JDBC jTDS, Kotlin puro)
+include(":core:local")  // Base del teléfono (SQLite): artículos, inventarios y conteos sin WiFi
+include(":core:sesion") // Sesión: configuración de conexión, usuario y empresa elegida
 include(":core:ui")     // Tema, colores y componentes visuales compartidos
 
 // Módulos "feature" (funciones): una carpeta por opción de la app
-include(":feature:login")      // Entrar (servidor, usuario, clave) y elegir la empresa
+include(":feature:login")      // Entrar, Configuración de la conexión y elegir la empresa
 include(":feature:inicio")     // Menú principal con las opciones
 include(":feature:articulos")  // Consultar artículos (código, descripción, contado) y sincronizar con Profit
-include(":feature:inventario") // Preparar inventarios por almacén, diferencias y cierre
-include(":feature:conteo")     // Contar: escanear códigos de barra en el inventario abierto
+include(":feature:inventario") // Traer las tomas abiertas de Profit y enviar (cerrar) lo contado
+include(":feature:conteo")     // Contar sin WiFi: escanear códigos de barra en la toma abierta
 include(":feature:admin")      // Usuarios, permisos y bitácora (administradores)

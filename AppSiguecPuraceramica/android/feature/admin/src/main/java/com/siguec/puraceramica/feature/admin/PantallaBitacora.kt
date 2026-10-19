@@ -150,7 +150,7 @@ private fun RenglonMovimiento(b: RenglonBitacoraDto) {
                     color = if (alerta) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
                 Text(b.fecha?.let { Formato.fecha(it) } ?: "", style = MaterialTheme.typography.labelSmall)
             }
-            val lugar = listOf(b.coEmpresa, b.ip).filter { it.isNotBlank() }.joinToString(" · ")
+            val lugar = listOf(b.coEmpresa, b.dispositivo).filter { it.isNotBlank() }.joinToString(" · ")
             if (lugar.isNotEmpty()) {
                 Text(lugar, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

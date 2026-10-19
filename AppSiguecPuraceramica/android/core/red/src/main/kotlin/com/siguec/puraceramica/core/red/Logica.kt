@@ -26,6 +26,9 @@ object Formato {
     /** Cantidad que viene como texto del servidor ("8.5" -> "8,5"; basura -> "—"). */
     fun cantidad(texto: String?): String = cantidad(texto?.trim()?.toDoubleOrNull())
 
+    /** Fecha y hora del teléfono: "2026-10-19 14:30:05". */
+    fun ahora(): String = java.time.LocalDateTime.now().withNano(0).toString().replace('T', ' ')
+
     /** "2026-10-19" -> "19/10/2026"; "2026-10-19 14:30:00" -> "19/10/2026 14:30". */
     fun fecha(texto: String): String {
         val partes = texto.trim().split(" ", "T")
@@ -54,44 +57,70 @@ object Inventario {
      * @return null si está bien; si no, el mensaje
      */
     fun validarCantidad(texto: String): String? {
-        val valor = texto.trim().replace(',', '.').toDoubleOrNull() ?: return "Escriba la cantidad contada"
-        if (kotlin.math.abs(valor) >= 1_000_000) return "Cantidad demasiado grande"
+        val valor = leer(texto) ?: return "Escriba la cantidad contada"
+        if (valor.abs() >= java.math.BigDecimal(1_000_000)) return "Cantidad demasiado grande"
+        if (valor.scale() > 5) return "Máximo 5 decimales"
         return null
+    }
+
+    /** Suma exacta de cantidades guardadas como texto ("2.5" + "6" = "8.5"). */
+    fun sumar(cantidades: List<String>): String =
+        texto(cantidades.fold(java.math.BigDecimal.ZERO) { suma, c -> suma + (c.toBigDecimalOrNull() ?: java.math.BigDecimal.ZERO) })
+
+    /** BigDecimal -> "8.5" (punto decimal, sin ceros de más; 0 -> "0"). */
+    fun texto(valor: java.math.BigDecimal): String =
+        if (valor.signum() == 0) "0" else valor.stripTrailingZeros().toPlainString()
+
+    /**
+     * Cantidad escrita (ya validada con [validarCantidad]) -> BigDecimal. Acepta coma o punto.
+     * @return null si no es un número
+     */
+    fun leer(texto: String): java.math.BigDecimal? = texto.trim().replace(',', '.').toBigDecimalOrNull()
+
+    /**
+     * Lo escrito -> patrón de LIKE: "tubo*pvc" -> "%tubo%pvc%". Se escapan \ % _ con "\"
+     * (la consulta usa ESCAPE '\') para que se busquen como letras.
+     */
+    fun patronLike(texto: String): String {
+        val limpio = texto.trim()
+        if (limpio.isEmpty()) return ""
+        val escapado = limpio.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return "%" + escapado.replace('*', '%') + "%"
     }
 
     /** Texto del stock contado en la consulta: "Contado: 8,5" o "Sin contar". */
     fun contado(texto: String?): String = if (texto == null) "Sin contar" else "Contado: ${Formato.cantidad(texto)}"
 
-    /** "Inventario N° 3 · Almacén 01 PRINCIPAL" */
+    /** "Toma N° 15 · Almacén 01 PRINCIPAL" (el número es el de la toma física de Profit) */
     fun titulo(i: InventarioDto): String =
-        "N° ${i.id} · Almacén ${i.coAlma}" + (if (i.desAlma.isNotBlank()) " ${i.desAlma}" else "")
+        "Toma N° ${i.numero} · Almacén ${i.coAlma}" + (if (i.desAlma.isNotBlank()) " ${i.desAlma}" else "")
 }
 
 /** Nombres que ve el administrador. */
 object Administracion {
 
-    /** Los permisos de un ambiente: nombre en la API -> texto para el usuario (en este orden). */
+    /** Los permisos de un ambiente: nombre de la columna (sin "puede_") -> texto para el usuario (en este orden). */
     val PERMISOS: List<Pair<String, String>> = listOf(
         "consultar_articulos" to "Consultar artículos (código, descripción y contado)",
         "sincronizar_articulos" to "Sincronizar artículos con Profit",
-        "preparar_inventario" to "Preparar, cerrar y comparar inventarios",
-        "contar_inventario" to "Contar (escanear y anotar)"
+        "contar_inventario" to "Traer inventarios abiertos y contar",
+        "cerrar_inventario" to "Cerrar: enviar el conteo a Profit"
     )
 
     /** PermisosDto -> {"consultar_articulos": true, ...} (lo que espera el servidor al guardar). */
     fun mapa(p: PermisosDto): Map<String, Boolean> = mapOf(
         "consultar_articulos" to p.consultarArticulos,
         "sincronizar_articulos" to p.sincronizarArticulos,
-        "preparar_inventario" to p.prepararInventario,
-        "contar_inventario" to p.contarInventario
+        "contar_inventario" to p.contarInventario,
+        "cerrar_inventario" to p.cerrarInventario
     )
 
-    /** Resumen corto de los permisos para la lista ("Consulta · Cuenta"). */
+    /** Resumen corto de los permisos para la lista ("Consulta · Cuenta · Cierra"). */
     fun resumen(p: PermisosDto): String = listOfNotNull(
         "Consulta".takeIf { p.consultarArticulos },
         "Sincroniza".takeIf { p.sincronizarArticulos },
-        "Prepara".takeIf { p.prepararInventario },
-        "Cuenta".takeIf { p.contarInventario }
+        "Cuenta".takeIf { p.contarInventario },
+        "Cierra".takeIf { p.cerrarInventario }
     ).joinToString(" · ").ifEmpty { "Sin permisos" }
 
     /** Acciones de la bitácora: código -> texto (las que no estén se muestran tal cual). */
@@ -101,9 +130,8 @@ object Administracion {
         "CLAVE_ERRADA" to "Clave errada",
         "BLOQUEO" to "Bloqueado",
         "SINCRONIZAR" to "Sincronizó artículos",
-        "INVENTARIO_ABRIR" to "Preparó inventario",
-        "INVENTARIO_CERRAR" to "Cerró inventario",
-        "CONTEO_BORRAR" to "Borró conteo de otro",
+        "TRAER_TOMA" to "Trajo toma física",
+        "ENVIAR_TOMA" to "Envió conteo a Profit",
         "ADMIN" to "Administración"
     )
 

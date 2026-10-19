@@ -4,16 +4,13 @@ package com.siguec.puraceramica.feature.conteo
 // ViewModel y sus corrutinas
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// Red: repositorios, DTO, formato y resultado
+// Base del teléfono (todo sin WiFi), modelos y formato
+import com.siguec.puraceramica.core.local.AlmacenLocal
 import com.siguec.puraceramica.core.red.ArticuloDto
 import com.siguec.puraceramica.core.red.ConteoDto
-import com.siguec.puraceramica.core.red.DetalleInventarioDto
 import com.siguec.puraceramica.core.red.Formato
 import com.siguec.puraceramica.core.red.Inventario
-import com.siguec.puraceramica.core.red.RepositorioArticulos
-import com.siguec.puraceramica.core.red.RepositorioConteos
-import com.siguec.puraceramica.core.red.RepositorioInventarios
-import com.siguec.puraceramica.core.red.Resultado
+import com.siguec.puraceramica.core.red.InventarioDto
 // Estado
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,9 +20,11 @@ import kotlinx.coroutines.launch
 
 /** Estado de la pantalla de contar. */
 data class EstadoConteo(
-    val detalle: DetalleInventarioDto? = null,  // El inventario y mis últimos conteos
+    val inventario: InventarioDto? = null,      // La toma física (guardada en el teléfono)
+    val misConteos: List<ConteoDto> = emptyList(), // Mis últimos conteos
+    val contadoPorMi: Int = 0,                  // Cuántos conteos llevo
     val cargando: Boolean = true,
-    val mensajeError: String? = null,           // No se pudo abrir el inventario
+    val mensajeError: String? = null,           // No existe en el teléfono
     val codigo: String = "",                    // Lo escaneado o escrito
     val articulo: ArticuloDto? = null,          // El artículo de ese código (para confirmar antes de anotar)
     val buscando: Boolean = false,
@@ -39,20 +38,23 @@ data class EstadoConteo(
 )
 
 /**
- * Lógica de contar en UN inventario abierto:
+ * Lógica de contar en UNA toma física abierta, TODO en el teléfono (sin WiFi):
  *  1. Se escanea (o escribe) el código de barras -> se muestra el artículo y lo ya contado.
  *  2. Se escribe la cantidad y "Anotar": queda un conteo A NOMBRE de quien cuenta.
  *  Modo rápido: cada escaneo anota 1 unidad y la cámara se vuelve a abrir.
  * Cada anotación SE SUMA al stock contado; si alguien se equivoca, borra su
  * conteo o anota en negativo.
  *
- * @param id número del inventario abierto
+ * @param local base del teléfono
+ * @param coEmpresa empresa elegida (los artículos son de esa empresa)
+ * @param id número interno (en el teléfono) del inventario
+ * @param usuario quien cuenta (cada conteo queda a su nombre)
  */
 class ConteoViewModel(
-    private val inventarios: RepositorioInventarios,
-    private val articulos: RepositorioArticulos,
-    private val conteos: RepositorioConteos,
-    private val id: Int
+    private val local: AlmacenLocal,
+    private val coEmpresa: String,
+    private val id: Int,
+    private val usuario: String
 ) : ViewModel() {
 
     private val _estado = MutableStateFlow(EstadoConteo())
@@ -64,11 +66,13 @@ class ConteoViewModel(
 
     /** El inventario y mis últimos conteos. */
     fun cargar() {
-        _estado.update { it.copy(cargando = true, mensajeError = null) }
         viewModelScope.launch {
-            when (val r = inventarios.detalle(id)) {
-                is Resultado.Exito -> _estado.update { it.copy(cargando = false, detalle = r.valor) }
-                is Resultado.Error -> _estado.update { it.copy(cargando = false, mensajeError = r.mensaje) }
+            val inventario = local.inventarios.leer(id)
+            val mios = local.inventarios.ultimos(id, usuario)
+            val cuantos = local.inventarios.cuantosDe(id, usuario)
+            _estado.update {
+                it.copy(cargando = false, inventario = inventario, misConteos = mios, contadoPorMi = cuantos,
+                    mensajeError = if (inventario == null) "Esta toma ya no está en el teléfono." else null)
             }
         }
     }
@@ -97,11 +101,12 @@ class ConteoViewModel(
         if (codigo.isEmpty()) return
         _estado.update { it.copy(buscando = true) }
         viewModelScope.launch {
-            when (val r = articulos.porCodigo(codigo, id)) {
-                is Resultado.Exito -> _estado.update {
-                    it.copy(buscando = false, articulo = r.valor, pedirCantidad = true)
-                }
-                is Resultado.Error -> _estado.update { it.copy(buscando = false, articulo = null, aviso = r.mensaje) }
+            val articulo = local.articulos.porCodigo(coEmpresa, codigo)
+            if (articulo == null) {
+                _estado.update { it.copy(buscando = false, articulo = null, aviso = noExiste(codigo)) }
+            } else {
+                val contado = local.inventarios.contado(id, articulo.coArt)
+                _estado.update { it.copy(buscando = false, articulo = articulo.copy(contado = contado), pedirCantidad = true) }
             }
         }
     }
@@ -122,22 +127,27 @@ class ConteoViewModel(
             _estado.update { it.copy(errorCantidad = error) }
             return
         }
+        val valor = Inventario.leer(cantidad) ?: return
         _estado.update { it.copy(anotando = true) }
         viewModelScope.launch {
-            when (val r = conteos.anotar(id, e.codigo, cantidad)) {
-                is Resultado.Exito -> {
-                    val c = r.valor.conteo
+            val articulo = local.articulos.porCodigo(coEmpresa, e.codigo)
+            val r = articulo?.let { local.inventarios.anotar(id, it.coArt, it.artDes, e.codigo.trim(), valor, usuario) }
+            when {
+                articulo == null -> _estado.update { it.copy(anotando = false, aviso = noExiste(e.codigo)) }
+                r == null -> _estado.update {
+                    it.copy(anotando = false, aviso = "Esta toma ya se envió a Profit: no se puede contar más.")
+                }
+                else -> {
+                    val c = r.conteo
                     // Listo para el siguiente: código y cantidad vacíos
                     _estado.update {
                         it.copy(anotando = false, codigo = "", cantidad = "", articulo = null,
                             abrirCamara = it.modoRapido,
                             aviso = "${c.coArt} ${c.artDes}: ${Inventario.diferencia(c.cantidad)} " +
-                                "(usted ${Formato.cantidad(r.valor.contadoUsuario)}, " +
-                                "total ${Formato.cantidad(r.valor.contadoTotal)})")
+                                "(usted ${Formato.cantidad(r.contadoUsuario)}, total ${Formato.cantidad(r.contadoTotal)})")
                     }
                     cargar()
                 }
-                is Resultado.Error -> _estado.update { it.copy(anotando = false, aviso = r.mensaje) }
             }
         }
     }
@@ -145,15 +155,17 @@ class ConteoViewModel(
     /** Borra un conteo equivocado (solo los propios, con el inventario abierto). */
     fun borrar(conteo: ConteoDto) {
         viewModelScope.launch {
-            when (val r = conteos.borrar(id, conteo.id)) {
-                is Resultado.Exito -> {
-                    _estado.update { it.copy(aviso = "Se borró ${Formato.cantidad(conteo.cantidad)} de ${conteo.coArt}") }
-                    cargar()
-                }
-                is Resultado.Error -> _estado.update { it.copy(aviso = r.mensaje) }
+            val borrado = local.inventarios.borrar(id, conteo.id, usuario)
+            _estado.update {
+                it.copy(aviso = if (borrado) "Se borró ${Formato.cantidad(conteo.cantidad)} de ${conteo.coArt}"
+                else "No se pudo borrar: la toma ya se envió a Profit.")
             }
+            cargar()
         }
     }
+
+    private fun noExiste(codigo: String) = "No hay ningún artículo con el código ${codigo.trim()} en este teléfono. " +
+        "Si es nuevo en Profit, sincronice los artículos (con WiFi)."
 
     /** El escáner no se pudo abrir. */
     fun alFallarEscaner(mensaje: String) = _estado.update { it.copy(aviso = mensaje, abrirCamara = false) }
