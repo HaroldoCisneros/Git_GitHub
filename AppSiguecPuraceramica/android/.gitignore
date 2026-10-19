@@ -1,0 +1,13 @@
+# Archivos que genera Android Studio / Gradle (no se suben)
+.gradle/
+build/
+*/build/
+*/*/build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuración del servidor de AppSiguecPuraceramica.
+
+  Para usarlo: copie este archivo como "config.xml" en la carpeta "servidor"
+  (junto a main.py) y coloque los datos reales. El config.xml real NO se sube
+  al repositorio porque tiene la clave de SQL Server.
+-->
+<configuracion>
+  <sqlserver>
+    <!-- El mismo servidor de Profit Plus 2K12 -->
+    <servidor>appsrv</servidor>
+    <!-- Usuario de SQL de la API (ver sql/03_permisos_usuario_sql.sql).
+         Vacío = autenticación de Windows. -->
+    <usuario>siguec_puraceramica</usuario>
+    <clave>CAMBIAR</clave>
+    <driver>ODBC Driver 17 for SQL Server</driver>
+    <!-- OJO: aquí NO va la base de la empresa. Las empresas están en la
+         tabla SIGUEC_PURACERAMICA.dbo.empresas. -->
+  </sqlserver>
+
+  <aplicacion>
+    <!-- Base propia de la App (usuarios, copia de artículos, inventarios y conteos) -->
+    <base_usuarios>SIGUEC_PURACERAMICA</base_usuarios>
+    <!-- Horas que dura la sesión del teléfono antes de pedir la clave otra vez -->
+    <horas_sesion>12</horas_sesion>
+    <!-- Claves erradas seguidas antes de bloquear al usuario, y minutos de bloqueo -->
+    <intentos_maximos>5</intentos_maximos>
+    <minutos_bloqueo>15</minutos_bloqueo>
+    <!-- Máximo de renglones por página en las consultas -->
+    <tamano_pagina_maximo>100</tamano_pagina_maximo>
+  </aplicacion>
+
+  <!-- Tablas y columnas de Profit Plus 2K12 (SOLO LECTURA). Estos son los
+       nombres de 2KDoce; si en su base alguno es distinto, cámbielo aquí
+       (confírmelos con sql/04_consultas_verificacion.sql). -->
+  <profit>
+    <tabla_articulos>saArticulo</tabla_articulos>
+    <col_codigo>co_art</col_codigo>
+    <col_descripcion>art_des</col_descripcion>
+    <col_anulado>anulado</col_anulado>
+    <!-- Columnas del artículo que también se pueden escanear (además de co_art),
+         separadas por coma. Las que no existan se ignoran. -->
+    <columnas_codigo>modelo,ref</columnas_codigo>
+    <!-- Tabla aparte con los códigos de barra (vacío = no hay) -->
+    <tabla_codigos_barra></tabla_codigos_barra>
+    <col_codigo_barra>cod_barra</col_codigo_barra>
+    <col_codigo_barra_articulo>co_art</col_codigo_barra_articulo>
+
+    <tabla_almacenes>saAlmacen</tabla_almacenes>
+    <col_almacen>co_alma</col_almacen>
+    <col_almacen_descripcion>des_alma</col_almacen_descripcion>
+
+    <!-- Existencia: un renglón por artículo, almacén y tipo (ACT = actual) -->
+    <tabla_stock>saStockAlmacen</tabla_stock>
+    <col_stock_almacen>co_alma</col_stock_almacen>
+    <col_stock_articulo>co_art</col_stock_articulo>
+    <col_stock_tipo>tipo</col_stock_tipo>
+    <tipo_stock_actual>ACT</tipo_stock_actual>
+    <col_stock_cantidad>stock</col_stock_cantidad>
+  </profit>
+
+  <servidor_web>
+    <!-- 127.0.0.1 = solo este equipo (el túnel de Tailscale o el proxy HTTPS
+         recibe a los teléfonos). Para probar en la red local sin túnel: 0.0.0.0 -->
+    <host>127.0.0.1</host>
+    <puerto>8000</puerto>
+  </servidor_web>
+</configuracion>

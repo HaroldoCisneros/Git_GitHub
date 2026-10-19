@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ================================================================
+     Ícono de la app (capa delantera): una ficha de inventario con la
+     franja roja, azul y naranja de SIGUEC arriba y renglones abajo.
+     Dibujo VECTORIAL (se ve nítido en cualquier pantalla). Lienzo de
+     108 x 108; Android recorta los bordes según la forma del teléfono,
+     por eso el dibujo va centrado (zona segura: 21 a 87).
+     ================================================================ -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Hoja blanca de la ficha (esquinas de abajo redondeadas) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,42 H76 V74 Q76,77 73,77 H35 Q32,77 32,74 Z" />
+
+    <!-- Franja ROJA (arriba a la izquierda, esquina redondeada) -->
+    <path
+        android:fillColor="#D11826"
+        android:pathData="M32,42 V36 Q32,33 35,33 H46.7 V42 Z" />
+
+    <!-- Franja AZUL (centro) -->
+    <path
+        android:fillColor="#6FA3D8"
+        android:pathData="M46.7,33 H61.3 V42 H46.7 Z" />
+
+    <!-- Franja NARANJA (arriba a la derecha, esquina redondeada) -->
+    <path
+        android:fillColor="#F19B1C"
+        android:pathData="M61.3,33 H73 Q76,33 76,36 V42 H61.3 Z" />
+
+    <!-- Renglones de artículos: código (corto) y descripción (largo) -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M38,48 H45 V51 H38 Z M48,48 H70 V51 H48 Z
+            M38,56 H45 V59 H38 Z M48,56 H66 V59 H48 Z
+            M38,64 H45 V67 H38 Z M48,64 H70 V67 H48 Z" />
+</vector>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tema base de la ventana. Los colores reales los pone Compose (core:ui/tema/Tema.kt). -->
+<resources>
+    <!-- Tema sin barra de título, porque Compose dibuja todo el contenido -->
+    <style name="Theme.AppSiguecPuraceramica" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

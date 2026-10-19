@@ -1,0 +1,197 @@
+// MÓDULO :feature:inicio
+// Paquete de la pantalla de inicio
+package com.siguec.puraceramica.feature.inicio
+
+// Herramientas de diseño
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+// Desplazamiento vertical (por si el menú no cabe)
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+// Iconos
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Warehouse
+// Componentes de Material 3
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+// Anotación para funciones que dibujan interfaz
+import androidx.compose.runtime.Composable
+// Alineación y modificadores
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+// Componentes compartidos
+import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
+import com.siguec.puraceramica.core.ui.componentes.LogoSiguec
+
+/**
+ * Menú principal (después de entrar y elegir la empresa).
+ *
+ * Para agregar una opción nueva: se crea su módulo feature/xxx, se agrega aquí
+ * una [OpcionMenu] con su acción y en :app su ruta.
+ *
+ * @param nombreUsuario nombre del usuario que entró
+ * @param nombreEmpresa empresa elegida (se muestra en la barra)
+ * @param variasEmpresas true = se muestra "Cambiar empresa"
+ * @param puedeContar permiso "contar inventario": opción "Contar"
+ * @param puedeConsultar permiso "consultar artículos" o "sincronizar": opción "Artículos"
+ * @param puedePreparar permiso "preparar inventario": opción "Inventarios por almacén"
+ * @param esAdministrador el usuario administra la App (usuarios, permisos y bitácora)
+ */
+@Composable
+fun PantallaInicio(
+    nombreUsuario: String,
+    nombreEmpresa: String,
+    variasEmpresas: Boolean,
+    puedeContar: Boolean,
+    puedeConsultar: Boolean,
+    puedePreparar: Boolean,
+    esAdministrador: Boolean,
+    alContar: () -> Unit,
+    alAbrirArticulos: () -> Unit,
+    alAbrirInventarios: () -> Unit,
+    alAbrirUsuarios: () -> Unit,
+    alAbrirBitacora: () -> Unit,
+    alCambiarEmpresa: () -> Unit,
+    alCerrarSesion: () -> Unit,
+    alSalir: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            BarraSuperior(
+                titulo = "AppSiguecPuraceramica",
+                subtitulo = nombreEmpresa,
+                acciones = {
+                    // Cerrar sesión: vuelve a la pantalla de usuario y clave
+                    IconButton(onClick = alCerrarSesion) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Cerrar sesión")
+                    }
+                    // Salir: cierra la App
+                    IconButton(onClick = alSalir) {
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Salir de la app")
+                    }
+                }
+            )
+        }
+    ) { margenes ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(margenes)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            LogoSiguec(Modifier.fillMaxWidth())
+            Text("Hola, $nombreUsuario", style = MaterialTheme.typography.headlineSmall)
+            Text("Toma de inventario", style = MaterialTheme.typography.bodyLarge)
+
+            // ---------- Opción 1: Contar (lo más usado, va primero) ----------
+            if (puedeContar) {
+                OpcionMenu(
+                    icono = Icons.Filled.QrCodeScanner,
+                    titulo = "Contar",
+                    descripcion = "Elegir el inventario abierto del almacén y escanear los códigos de barra",
+                    alTocar = alContar
+                )
+            }
+
+            // ---------- Opción 2: Artículos (consultar y sincronizar) ----------
+            if (puedeConsultar) {
+                OpcionMenu(
+                    icono = Icons.Filled.Inventory2,
+                    titulo = "Artículos",
+                    descripcion = "Consultar código, descripción y stock contado; sincronizar con Profit",
+                    alTocar = alAbrirArticulos
+                )
+            }
+
+            // ---------- Opción 3: Inventarios por almacén ----------
+            if (puedePreparar) {
+                OpcionMenu(
+                    icono = Icons.Filled.Warehouse,
+                    titulo = "Inventarios por almacén",
+                    descripcion = "Preparar (abrir) el inventario de un almacén, ver diferencias y cerrarlo",
+                    alTocar = alAbrirInventarios
+                )
+            }
+
+            // ---------- Administración (solo administradores) ----------
+            if (esAdministrador) {
+                OpcionMenu(
+                    icono = Icons.Filled.AdminPanelSettings,
+                    titulo = "Usuarios y permisos",
+                    descripcion = "Crear usuarios, darles empresas y permisos, desbloquearlos",
+                    alTocar = alAbrirUsuarios
+                )
+                OpcionMenu(
+                    icono = Icons.Filled.History,
+                    titulo = "Bitácora",
+                    descripcion = "Quién entró, sincronizó, preparó o cerró inventarios y cuándo",
+                    alTocar = alAbrirBitacora
+                )
+            }
+
+            // ---------- Cambiar empresa ----------
+            if (variasEmpresas) {
+                OpcionMenu(
+                    icono = Icons.Filled.Business,
+                    titulo = "Cambiar empresa",
+                    descripcion = "Trabajar con otra base de Profit",
+                    alTocar = alCambiarEmpresa
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Tarjeta de una opción del menú (icono + título + descripción).
+ * @param alTocar acción; null = tarjeta apagada (opción todavía no disponible)
+ */
+@Composable
+private fun OpcionMenu(icono: ImageVector, titulo: String, descripcion: String, alTocar: (() -> Unit)?) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (alTocar != null) Modifier.clickable(onClick = alTocar) else Modifier),
+        colors = if (alTocar != null) CardDefaults.cardColors()
+        else CardDefaults.cardColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+    ) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icono,
+                contentDescription = null, // El título ya describe la opción
+                tint = if (alTocar != null) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(titulo, style = MaterialTheme.typography.titleMedium)
+                Text(descripcion, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}

@@ -1,0 +1,46 @@
+// MÓDULO :core:red (pruebas)
+package com.siguec.puraceramica.core.red
+
+// JUnit
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Test
+
+/** Pruebas de Formato, Inventario y Administracion (Logica.kt). */
+class LogicaTest {
+
+    @Test
+    fun formatoVenezolano() {
+        assertEquals("1.250", Formato.cantidad("1250"))
+        assertEquals("8,5", Formato.cantidad("8.5"))
+        assertEquals("—", Formato.cantidad("abc"))
+        assertEquals("19/10/2026 14:30", Formato.fecha("2026-10-19 14:30:00"))
+        assertEquals("19/10/2026", Formato.fecha("2026-10-19"))
+    }
+
+    @Test
+    fun cantidadesDelInventario() {
+        assertNull(Inventario.validarCantidad("2,5"))
+        assertNull(Inventario.validarCantidad("0"))
+        assertNull(Inventario.validarCantidad("-1"))
+        assertNotNull(Inventario.validarCantidad(""))
+        assertNotNull(Inventario.validarCantidad("2000000"))
+        assertEquals("+2", Inventario.diferencia("2"))
+        assertEquals("-3,5", Inventario.diferencia("-3.5"))
+        assertEquals(-1, Inventario.signo("-1"))
+        assertEquals("Sin contar", Inventario.contado(null))
+        assertEquals("Contado: 8,5", Inventario.contado("8.5"))
+        assertEquals("N° 3 · Almacén 01 PRINCIPAL", Inventario.titulo(InventarioDto(id = 3, coAlma = "01", desAlma = "PRINCIPAL")))
+    }
+
+    @Test
+    fun permisosDelAdministrador() {
+        val p = PermisosDto(consultarArticulos = true, contarInventario = true)
+        assertEquals("Consulta · Cuenta", Administracion.resumen(p))
+        assertEquals(Administracion.PERMISOS.map { it.first }, Administracion.mapa(p).keys.toList())
+        assertEquals("Sincronizó artículos", Administracion.accion("SINCRONIZAR"))
+        assertNull(Administracion.validarNuevo("ANA", "Ana", "secreta", "secreta"))
+        assertNotNull(Administracion.validarNuevo("a b", "Ana", "secreta", "secreta"))
+    }
+}

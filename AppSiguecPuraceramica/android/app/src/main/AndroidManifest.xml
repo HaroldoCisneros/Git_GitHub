@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ================================================================
+     AndroidManifest.xml
+     "Carta de presentación" de la app para Android: nombre, ícono,
+     permisos y cuál pantalla se abre primero.
+     ================================================================ -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permiso para conectarse por internet con el servidor de AppSiguecPuraceramica -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".SiguecApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="${permitirHttp}"
+        android:theme="@style/Theme.AppSiguecPuraceramica">
+        <!-- name: clase que arranca primero (crea la sesión)                     -->
+        <!-- allowBackup=false: el token de la sesión no se copia a la nube        -->
+        <!-- usesCleartextTraffic: "http://" solo en la versión de prueba (debug); -->
+        <!--   la versión para los usuarios (release) exige "https://"             -->
+
+        <!-- Escáner de códigos de Google: que Play Services lo descargue al instalar la App
+             (si no, se descarga la primera vez que se toca "Escanear" y tarda un poco) -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
+
+        <!-- La única Activity; las pantallas van dentro con Compose -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- adjustResize: la pantalla se ajusta cuando sale el teclado -->
+
+            <!-- Esta Activity es la que abre el ícono de la app -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

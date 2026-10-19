@@ -1,0 +1,8 @@
+# El config.xml real tiene la clave de SQL Server: nunca se sube
+config.xml
+*.log
+*.log.*
+__pycache__/
+.pytest_cache/
+.venv/
+venv/

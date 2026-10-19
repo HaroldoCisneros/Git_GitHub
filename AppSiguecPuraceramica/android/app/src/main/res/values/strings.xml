@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos de la app. Tenerlos aquí facilita cambiarlos o traducirlos. -->
+<resources>
+    <!-- Nombre que aparece debajo del ícono -->
+    <string name="app_name">AppSiguecPuraceramica</string>
+</resources>

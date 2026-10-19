@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colores usados por los recursos XML (los de las pantallas están en core:ui/ColoresMarca) -->
+<resources>
+    <!-- Fondo negro del ícono de la app -->
+    <color name="fondo_icono">#FF000000</color>
+</resources>
