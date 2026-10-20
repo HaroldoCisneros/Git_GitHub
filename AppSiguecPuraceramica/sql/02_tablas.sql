@@ -47,6 +47,7 @@ CREATE TABLE dbo.usuarios (
     clave_hash         varchar(200)  NOT NULL,               -- pbkdf2_sha256$rep$sal$hash
     usuario_profit     varchar(10)   NULL,                   -- Usuario de Profit (se graba en la toma física)
     es_administrador   bit           NOT NULL CONSTRAINT df_usuarios_admin DEFAULT 0,
+    puede_configurar   bit           NOT NULL CONSTRAINT df_usuarios_configurar DEFAULT 0, -- Cambia la Configuración del teléfono
     activo             bit           NOT NULL CONSTRAINT df_usuarios_activo DEFAULT 1,
     intentos_fallidos  int           NOT NULL CONSTRAINT df_usuarios_intentos DEFAULT 0,
     bloqueado_hasta    datetime      NULL,                   -- Bloqueo temporal por claves erradas
@@ -54,6 +55,11 @@ CREATE TABLE dbo.usuarios (
     ultimo_acceso      datetime      NULL,
     CONSTRAINT uq_usuarios_usuario UNIQUE (usuario)
 );
+GO
+
+-- Bases creadas con una versión anterior: permiso de cambiar la Configuración del teléfono
+IF COL_LENGTH('dbo.usuarios', 'puede_configurar') IS NULL
+    ALTER TABLE dbo.usuarios ADD puede_configurar bit NOT NULL CONSTRAINT df_usuarios_configurar DEFAULT 0;
 GO
 
 /* ---------- ambientes ---------- */

@@ -109,6 +109,7 @@ class ConfiguracionViewModel(private val gestor: GestorSesion) : ViewModel() {
         viewModelScope.launch {
             when (val r = gestor.probarConexion(config)) {
                 is Resultado.Exito -> {
+                    // Otra empresa con la sesión abierta: el gestor cierra la sesión (se vuelve a la entrada)
                     gestor.guardarConexion(config)
                     _estado.update { it.copy(probando = false, guardado = true) }
                 }

@@ -130,6 +130,7 @@ fun PantallaUsuario(
                             alEditar = { dialogo = Dialogo.Datos },
                             alActivar = vm::activar,
                             alAdministrador = vm::administrador,
+                            alConfigurar = vm::configurar,
                             alDesbloquear = vm::desbloquear,
                             alClave = { dialogo = Dialogo.Clave })
                     }
@@ -185,7 +186,7 @@ fun PantallaUsuario(
     }
 }
 
-/** Datos del usuario con los interruptores de activo y administrador. */
+/** Datos del usuario con los interruptores de activo, administrador y Configuración. */
 @Composable
 private fun TarjetaDatos(
     u: UsuarioAdminDto,
@@ -194,6 +195,7 @@ private fun TarjetaDatos(
     alEditar: () -> Unit,
     alActivar: (Boolean) -> Unit,
     alAdministrador: (Boolean) -> Unit,
+    alConfigurar: (Boolean) -> Unit,
     alDesbloquear: () -> Unit,
     alClave: () -> Unit
 ) {
@@ -212,6 +214,9 @@ private fun TarjetaDatos(
             // Interruptores (uno mismo no se puede desactivar ni quitar el administrador)
             Interruptor("Activo", u.activo, enabled = !guardando && !propio, alCambiar = alActivar)
             Interruptor("Administrador", u.esAdministrador, enabled = !guardando && !propio, alCambiar = alAdministrador)
+            // Cambiar la Configuración del teléfono (servidor, bases, moneda); el administrador siempre puede
+            Interruptor("Puede cambiar la Configuración", u.esAdministrador || u.puedeConfigurar,
+                enabled = !guardando && !u.esAdministrador, alCambiar = alConfigurar)
             if (propio) {
                 Text("Usted mismo: no puede desactivarse ni quitarse el administrador.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

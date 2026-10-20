@@ -39,8 +39,12 @@ data class UsuarioDto(
     val usuario: String,
     val nombre: String,
     val esAdministrador: Boolean = false,
-    val usuarioProfit: String = ""              // Se graba en la toma física de Profit
-)
+    val usuarioProfit: String = "",             // Se graba en la toma física de Profit
+    val puedeConfigurar: Boolean = false        // Puede cambiar la Configuración del teléfono
+) {
+    /** Los administradores siempre pueden cambiar la Configuración. */
+    val autorizaConfiguracion: Boolean get() = esAdministrador || puedeConfigurar
+}
 
 /**
  * La sesión en el teléfono.
@@ -161,7 +165,8 @@ data class EntradaUsuarioCambiosDto(
     val nombre: String? = null,
     val usuarioProfit: String? = null,
     val esAdministrador: Boolean? = null,
-    val activo: Boolean? = null
+    val activo: Boolean? = null,
+    val puedeConfigurar: Boolean? = null
 )
 
 /** Empresa, almacén y permisos de un usuario: {"contar_inventario": true, ...}. */
@@ -191,6 +196,7 @@ data class UsuarioAdminDto(
     val nombre: String = "",
     val usuarioProfit: String = "",
     val esAdministrador: Boolean = false,
+    val puedeConfigurar: Boolean = false,        // Puede cambiar la Configuración del teléfono
     val activo: Boolean = true,
     val bloqueado: Boolean = false,              // Bloqueado ahora por claves erradas
     val bloqueadoHasta: String? = null,

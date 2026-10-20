@@ -25,8 +25,8 @@ private const val MINUTOS_BLOQUEO = 15
 private const val MENSAJE_INCORRECTO = "Usuario o clave incorrectos."
 
 // "a.*": si en el futuro se agregan permisos, la entrada no falla con una base vieja
-private const val SQL_USUARIO = """SELECT id, usuario, nombre, clave_hash, usuario_profit, es_administrador, activo,
-    intentos_fallidos, bloqueado_hasta, CASE WHEN bloqueado_hasta > GETDATE() THEN 1 ELSE 0 END AS bloqueado,
+private const val SQL_USUARIO = """SELECT id, usuario, nombre, clave_hash, usuario_profit, es_administrador, puede_configurar,
+    activo, intentos_fallidos, bloqueado_hasta, CASE WHEN bloqueado_hasta > GETDATE() THEN 1 ELSE 0 END AS bloqueado,
     CONVERT(varchar(5), bloqueado_hasta, 108) AS hora_desbloqueo
     FROM dbo.usuarios WHERE usuario = ?"""
 private const val SQL_AMBIENTES = """SELECT a.*, e.nombre FROM dbo.ambientes a
@@ -148,7 +148,7 @@ class RepositorioAcceso(private val bd: BaseDatos, val dispositivo: String) {
                         cx.anotar(Acciones.ENTRADA, id, codigo, "", dispositivo, dispositivo)
                         Entrada(
                             SesionDto(UsuarioDto(id, codigo, f.texto("nombre"), f.logico("es_administrador"),
-                                f.texto("usuario_profit")), ambientes),
+                                f.texto("usuario_profit"), f.logico("puede_configurar")), ambientes),
                             f.texto("clave_hash")
                         )
                     }

@@ -114,4 +114,12 @@ class ConexionTest {
         assertEquals(0, BigDecimal("8.5").compareTo(totales["A"]))
         assertEquals(0, BigDecimal.ZERO.compareTo(totales["B"]))
     }
+
+    @Test
+    fun quienPuedeCambiarLaConfiguracion() {
+        // Administradores siempre; los demás solo con el permiso "Puede cambiar la Configuración"
+        assertEquals(false, UsuarioDto(1, "PEDRO", "Pedro").autorizaConfiguracion)
+        assertEquals(true, UsuarioDto(2, "ANA", "Ana", puedeConfigurar = true).autorizaConfiguracion)
+        assertEquals(true, UsuarioDto(3, "ADMIN", "Admin", esAdministrador = true).autorizaConfiguracion)
+    }
 }

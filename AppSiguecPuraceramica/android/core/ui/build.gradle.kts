@@ -49,4 +49,8 @@ dependencies {
     api(libs.compose.ui.tooling.preview)
     // Escáner de códigos de barras con la cámara (Google Code Scanner): EscanerCodigo.kt
     implementation(libs.play.services.code.scanner)
+    // Entrada con huella (huella/Huella.kt); "api" = MainActivity usa su FragmentActivity
+    api(libs.androidx.biometric)
+    // Corrutinas: esperar la respuesta de la ventana de huella
+    implementation(libs.kotlinx.coroutines.core)
 }

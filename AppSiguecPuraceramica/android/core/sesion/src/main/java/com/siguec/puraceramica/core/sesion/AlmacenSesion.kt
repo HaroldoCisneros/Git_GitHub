@@ -18,6 +18,13 @@ import kotlinx.serialization.json.Json
 internal data class UsuarioRecordado(val claveHash: String, val sesion: SesionDto)
 
 /**
+ * Entrada con huella de un usuario en este teléfono: su clave CIFRADA con una llave del
+ * Android Keystore que solo se abre con la huella (ver core/ui/huella/Huella.kt).
+ */
+@Serializable
+data class HuellaGuardada(val cifrado: String, val iv: String)
+
+/**
  * Lo que se guarda en el teléfono entre una apertura y otra de la App
  * (SharedPreferences: archivo privado de la App; allowBackup=false en el
  * manifiesto, así no se copia a la nube).
@@ -26,6 +33,7 @@ internal data class UsuarioRecordado(val claveHash: String, val sesion: SesionDt
  *  - La sesión actual (usuario y empresas) y la empresa elegida.
  *  - Por cada usuario que entró con WiFi: el HASH de su clave (nunca la clave)
  *    y sus permisos, para poder entrar sin WiFi.
+ *  - Por cada usuario que activó la huella: su clave cifrada (solo se abre con la huella).
  */
 internal class AlmacenSesion(contexto: Context) {
 
@@ -73,6 +81,28 @@ internal class AlmacenSesion(contexto: Context) {
         preferencias.edit { putString(RECORDADOS, json.encodeToString(serializadorRecordados, nuevos)) }
     }
 
+    // ---------- Huella (por usuario) ----------
+
+    private val serializadorHuellas = MapSerializer(String.serializer(), HuellaGuardada.serializer())
+
+    private fun huellas(): Map<String, HuellaGuardada> = preferencias.getString(HUELLAS, null)
+        ?.let { runCatching { json.decodeFromString(serializadorHuellas, it) }.getOrNull() }
+        .orEmpty()
+
+    fun huella(usuario: String): HuellaGuardada? = huellas()[usuario.uppercase()]
+
+    fun guardarHuella(usuario: String, huella: HuellaGuardada?) {
+        val nuevas = huellas().toMutableMap()
+        if (huella == null) nuevas.remove(usuario.uppercase()) else nuevas[usuario.uppercase()] = huella
+        preferencias.edit { putString(HUELLAS, json.encodeToString(serializadorHuellas, nuevas)) }
+    }
+
+    /** El usuario dijo "No" a activar la huella: no se le vuelve a preguntar en este teléfono. */
+    fun huellaRechazada(usuario: String): Boolean = preferencias.getBoolean(SIN_HUELLA + usuario.uppercase(), false)
+
+    fun rechazarHuella(usuario: String, rechazada: Boolean) =
+        preferencias.edit { putBoolean(SIN_HUELLA + usuario.uppercase(), rechazada) }
+
     // ---------- Último inventario en que se contó (por empresa) ----------
 
     fun inventario(empresa: String): Int? = preferencias.getInt(INVENTARIO + empresa, 0).takeIf { it > 0 }
@@ -88,5 +118,7 @@ internal class AlmacenSesion(contexto: Context) {
         const val EMPRESA = "empresa"
         const val RECORDADOS = "usuarios_recordados"
         const val INVENTARIO = "inventario_" // + co_empresa
+        const val HUELLAS = "huellas"
+        const val SIN_HUELLA = "sin_huella_" // + usuario
     }
 }

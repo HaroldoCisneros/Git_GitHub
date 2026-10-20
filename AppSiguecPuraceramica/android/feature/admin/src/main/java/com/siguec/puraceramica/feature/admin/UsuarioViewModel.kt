@@ -87,6 +87,11 @@ class UsuarioViewModel(
             repositorio.cambiar(id, EntradaUsuarioCambiosDto(esAdministrador = esAdministrador))
         }
 
+    fun configurar(puede: Boolean) =
+        guardar(if (puede) "Ahora puede cambiar la Configuración" else "Ya no puede cambiar la Configuración") {
+            repositorio.cambiar(id, EntradaUsuarioCambiosDto(puedeConfigurar = puede))
+        }
+
     fun desbloquear() = guardar("Usuario desbloqueado") { repositorio.desbloquear(id) }
 
     fun guardarAmbiente(coEmpresa: String, almacen: String, permisos: Map<String, Boolean>) =

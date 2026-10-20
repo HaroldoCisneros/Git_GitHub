@@ -71,9 +71,68 @@ class GestorSesion(contexto: Context) {
     /** ¿Ya se configuró la conexión? (la primera vez se abre Configuración). */
     val conexionConfigurada: Boolean get() = almacen.conexion.completa
 
-    fun guardarConexion(config: ConfigConexion) {
+    /**
+     * Guarda la Configuración. Si se cambió la base de Profit (otra empresa) y hay una sesión
+     * abierta, la cierra: al volver a entrar se trabaja con la empresa nueva.
+     * @return true = se cerró la sesión
+     */
+    fun guardarConexion(config: ConfigConexion): Boolean {
+        val otraEmpresa = !config.baseProfit.trim().equals(almacen.conexion.baseProfit.trim(), ignoreCase = true)
         almacen.conexion = config
+        if (otraEmpresa && _sesion.value != null) {
+            salir()
+            return true
+        }
+        return false
     }
+
+    /**
+     * Antes de abrir Configuración (cuando ya está configurada): usuario y clave (o huella) de
+     * alguien con permiso "Puede cambiar la Configuración" o administrador.
+     * Se revisa en el servidor; si no responde (sin WiFi o la conexión es justo lo que hay que
+     * corregir), con la clave guardada de un usuario que ya entró antes en este teléfono.
+     */
+    suspend fun autorizarConfiguracion(usuario: String, clave: String): Resultado<UsuarioDto> {
+        val codigo = usuario.trim().uppercase()
+        if (codigo.isEmpty() || clave.isEmpty()) return Resultado.Error("Escriba el usuario y la clave.", TipoError.VALIDACION)
+        val u = when (val r = acceso().entrar(codigo, clave)) {
+            is Resultado.Exito -> {
+                almacen.recordar(codigo, UsuarioRecordado(r.valor.claveHash, r.valor.sesion))
+                r.valor.sesion.usuario
+            }
+            is Resultado.Error -> when (r.tipo) {
+                TipoError.SIN_CONEXION, TipoError.CONEXION, TipoError.SERVIDOR -> {
+                    val recordado = almacen.recordado(codigo) ?: return Resultado.Error(
+                        "${r.mensaje}\nSin conexión con el servidor solo se puede autorizar un usuario que ya " +
+                            "entró antes en este teléfono.", r.tipo)
+                    val coincide = withContext(Dispatchers.Default) { Seguridad.claveCoincide(clave, recordado.claveHash) }
+                    if (!coincide) return Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
+                    recordado.sesion.usuario
+                }
+                else -> return r
+            }
+        }
+        return if (u.autorizaConfiguracion) Resultado.Exito(u) else Resultado.Error(
+            "El usuario $codigo no tiene permiso para cambiar la Configuración. El administrador se lo da en " +
+                "Usuarios y permisos.", TipoError.PERMISO)
+    }
+
+    // ---------- Huella (por usuario, en este teléfono) ----------
+
+    /** La clave cifrada con la huella de ese usuario (null = no activó la huella aquí). */
+    fun huella(usuario: String): HuellaGuardada? = almacen.huella(usuario.trim())
+
+    /** Activa (o quita, con null) la entrada con huella de ese usuario. */
+    fun guardarHuella(usuario: String, huella: HuellaGuardada?) {
+        almacen.guardarHuella(usuario.trim(), huella)
+        if (huella != null) almacen.rechazarHuella(usuario.trim(), false)
+    }
+
+    /** ¿Se le ofrece activar la huella después de entrar con la clave? */
+    fun ofrecerHuella(usuario: String): Boolean = huella(usuario) == null && !almacen.huellaRechazada(usuario.trim())
+
+    /** Dijo que no: no se le vuelve a preguntar en este teléfono. */
+    fun noOfrecerHuella(usuario: String) = almacen.rechazarHuella(usuario.trim(), true)
 
     /** Prueba una configuración (sin guardarla). */
     suspend fun probarConexion(config: ConfigConexion): Resultado<String> =

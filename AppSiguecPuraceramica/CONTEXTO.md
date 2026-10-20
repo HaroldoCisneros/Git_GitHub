@@ -57,6 +57,16 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     los administradores (empresas + ambientes) si falta; al entrar se usa esa empresa.
     El usuario de SQL `siguec_puraceramica` lo crea sql/03 (el mensaje de error lo dice).
 
+14. **Huella y Configuración protegida** (pedido del usuario, opción "Ambos"):
+    - Entrada con huella para todos: la clave se cifra con una llave del Android Keystore
+      (BiometricPrompt + CryptoObject, BIOMETRIC_STRONG, invalidada al cambiar las huellas);
+      con huella se descifra y se entra normal. androidx.biometric 1.1.0; MainActivity es
+      FragmentActivity.
+    - Configuración ya configurada: pide huella o clave de un usuario con
+      usuarios.puede_configurar = 1 (nuevo, sql/02) o administrador; varios usuarios.
+      Sin servidor, con el hash recordado en el teléfono.
+    - Bases de datos cambiables más adelante; cambiar la base de Profit cierra la sesión.
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
@@ -64,4 +74,4 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 - Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
   (procedimientos de Softech, con pista de auditoría).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
-  :core:red sí se compiló y probó: 17 pruebas OK).
+  :core:red sí se compiló y probó: 18 pruebas OK).

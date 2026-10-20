@@ -102,7 +102,9 @@ fun PantallaConfiguracion(gestor: GestorSesion, alVolver: () -> Unit) {
             OutlinedTextField(estado.baseProfit, vm::alCambiarBaseProfit, label = { Text("Base de datos de Profit (empresa)") },
                 placeholder = { Text("SAPURA_A") }, singleLine = true,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
-                modifier = Modifier.fillMaxWidth())
+                modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("Se puede cambiar más adelante: al guardar otra empresa se cierra la sesión y " +
+                    "se entra con la nueva (sus artículos se sincronizan de nuevo).") })
 
             OutlinedButton(onClick = vm::probar, enabled = !estado.probando, modifier = Modifier.fillMaxWidth()) {
                 if (estado.probando) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

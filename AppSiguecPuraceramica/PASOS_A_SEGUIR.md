@@ -54,7 +54,7 @@ Ejecutar en este orden (carpeta `sql/`):
    (el escáner de códigos de barra es el de Google y no pide permiso de cámara).
 
 > Nota: en la sesión de desarrollo el módulo de conexión (`core/red`) se compiló y
-> pasó sus 17 pruebas, pero las pantallas no se pudieron compilar allí (sin acceso a
+> pasó sus 18 pruebas, pero las pantallas no se pudieron compilar allí (sin acceso a
 > Google Maven). Si Android Studio marca algún error al compilar, envíeme el mensaje.
 
 ## Paso 4. Configurar el teléfono
@@ -74,6 +74,25 @@ Ejecutar en este orden (carpeta `sql/`):
    con sus permisos:
    - *Consultar artículos*, *Contar*: los que cuentan.
    - *Sincronizar artículos*, *Cerrar (enviar a Profit)*: el encargado.
+   - **Puede cambiar la Configuración** (en la ficha del usuario): los que podrán cambiar
+     servidor, bases de datos y moneda. Pueden ser varios; los administradores siempre pueden.
+7. **Huella**: cada usuario entra la primera vez con su clave y la App pregunta
+   **"¿Entrar con huella?"** → **Activar huella** → pone el dedo. Desde ahí entra con
+   **"Entrar con huella"**. Actívela solo en SU teléfono: Android acepta cualquier huella
+   registrada en el teléfono. Si cambia su clave o se agrega una huella nueva al teléfono,
+   entra una vez con la clave y la vuelve a activar. "Quitar la huella" la borra del teléfono.
+
+### Cambiar la Configuración más adelante
+
+Configuración (entrada o menú) → la App pide **usuario + huella** (o su clave) de alguien
+con permiso **Puede cambiar la Configuración** o administrador → se pueden cambiar el
+servidor, el usuario de SQL, la **base de la App**, la **base de datos de Profit** y la moneda
+→ **Guardar** (verifica antes de guardar). Si se cambia la base de Profit (otra empresa), se
+cierra la sesión: al entrar se trabaja con la empresa nueva y hay que sincronizar sus
+artículos. A los usuarios que no son administradores el administrador les da la empresa
+nueva en Usuarios y permisos.
+Sin WiFi (o si la conexión es justo lo que hay que corregir) se autoriza con la clave
+guardada de un usuario que ya entró antes en ese teléfono.
 
 ## Paso 5. Uso en una toma de inventario
 

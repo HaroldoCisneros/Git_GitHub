@@ -145,6 +145,7 @@ private fun RenglonUsuario(u: UsuarioAdminDto, alTocar: () -> Unit) {
                     fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 val avisos = listOfNotNull(
                     "ADMINISTRADOR".takeIf { u.esAdministrador },
+                    "CONFIGURACIÓN".takeIf { u.puedeConfigurar && !u.esAdministrador },
                     "BLOQUEADO".takeIf { u.bloqueado },
                     "INACTIVO".takeIf { !u.activo }
                 ).joinToString(" · ")

@@ -51,6 +51,21 @@ primera vez registra la empresa en la App y se la da a los administradores (no h
 hacerlo a mano en SQL). La clave de SQL guardada
 **nunca se muestra** (solo se puede escribir una nueva).
 
+**Protegida**: una vez configurada, Configuración solo se abre con **huella** (o clave) de un
+usuario con permiso **"Puede cambiar la Configuración"** (se da en la ficha del usuario; pueden
+ser varios) o de un administrador. Todos los datos, incluidas las **bases de datos**, se
+pueden cambiar más adelante; si se cambia la base de Profit se cierra la sesión y se entra
+con la empresa nueva.
+
+## Entrada con huella
+
+Después de entrar con la clave, la App ofrece **activar la huella** en ese teléfono. La
+clave queda **cifrada con una llave del Android Keystore que solo se abre con la huella**
+(`core/ui/huella/Huella.kt`); al entrar con huella se descifra y se entra igual que con la
+clave (el servidor revisa clave, bloqueo y permisos como siempre). Si se agrega una huella
+al teléfono o cambia la clave, hay que volver a activarla. Android no distingue de quién es
+la huella: cada usuario la activa solo en su propio teléfono.
+
 **Seguridad de la conexión directa** (decisión tomada): la clave del usuario de SQL
 queda guardada en cada teléfono. Por eso:
 - Usuario de SQL exclusivo `siguec_puraceramica` con lo mínimo (sql/03): su base, `SELECT`
@@ -151,6 +166,6 @@ android/
 ```
 
 ## Pruebas
-`cd android && gradlew :core:red:test`: 17 pruebas (conexión, nombres de Profit,
+`cd android && gradlew :core:red:test`: 18 pruebas (conexión, nombres de Profit,
 sincronización, totales del envío, claves compatibles con AppSighecMovil y el ADMIN
 del script SQL). Las pantallas y la base del teléfono se compilan en Android Studio.

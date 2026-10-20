@@ -19,7 +19,7 @@ private const val LARGO_NOMBRE = 100
 /** Nombres de los permisos (columnas puede_* de ambientes), en el orden de la pantalla. */
 val NOMBRES_PERMISOS = listOf("consultar_articulos", "sincronizar_articulos", "contar_inventario", "cerrar_inventario")
 
-private const val SQL_LISTA = """SELECT id, usuario, nombre, usuario_profit, es_administrador, activo, intentos_fallidos,
+private const val SQL_LISTA = """SELECT id, usuario, nombre, usuario_profit, es_administrador, puede_configurar, activo, intentos_fallidos,
     CONVERT(varchar(19), bloqueado_hasta, 120) AS bloqueado_hasta,
     CASE WHEN bloqueado_hasta > GETDATE() THEN 1 ELSE 0 END AS bloqueado,
     CONVERT(varchar(19), ultimo_acceso, 120) AS ultimo_acceso FROM dbo.usuarios"""
@@ -57,6 +57,7 @@ class RepositorioAdmin(private val bd: BaseDatos, private val actor: UsuarioDto,
         nombre = f.texto("nombre"),
         usuarioProfit = f.texto("usuario_profit"),
         esAdministrador = f.logico("es_administrador"),
+        puedeConfigurar = f.logico("puede_configurar"),
         activo = f.logico("activo"),
         bloqueado = f.logico("bloqueado"),
         bloqueadoHasta = f.texto("bloqueado_hasta").ifEmpty { null },
@@ -133,15 +134,17 @@ class RepositorioAdmin(private val bd: BaseDatos, private val actor: UsuarioDto,
             val profit = cambios.usuarioProfit?.trim()?.uppercase() ?: actual.usuarioProfit
             val admin = cambios.esAdministrador ?: actual.esAdministrador
             val activo = cambios.activo ?: actual.activo
+            val configurar = cambios.puedeConfigurar ?: actual.puedeConfigurar
             if (nombre.isEmpty() || nombre.length > LARGO_NOMBRE) throw ErrorApp("Escriba el nombre (máximo $LARGO_NOMBRE caracteres).")
             if (!PATRON_PROFIT.matches(profit)) throw ErrorApp("El usuario de Profit admite máximo 10 letras o números.")
-            cx.ejecutar("UPDATE dbo.usuarios SET nombre = ?, usuario_profit = ?, es_administrador = ?, activo = ? WHERE id = ?",
-                nombre, profit.ifEmpty { null }, admin, activo, id)
+            cx.ejecutar("UPDATE dbo.usuarios SET nombre = ?, usuario_profit = ?, es_administrador = ?, activo = ?, " +
+                "puede_configurar = ? WHERE id = ?", nombre, profit.ifEmpty { null }, admin, activo, configurar, id)
             val detalle = listOfNotNull(
                 "nombre '$nombre'".takeIf { nombre != actual.nombre },
                 "usuario Profit '$profit'".takeIf { profit != actual.usuarioProfit },
                 ("administrador " + if (admin) "SÍ" else "NO").takeIf { admin != actual.esAdministrador },
-                (if (activo) "activado" else "desactivado").takeIf { activo != actual.activo }
+                (if (activo) "activado" else "desactivado").takeIf { activo != actual.activo },
+                ("cambia la Configuración " + if (configurar) "SÍ" else "NO").takeIf { configurar != actual.puedeConfigurar }
             )
             if (detalle.isNotEmpty()) anotar(cx, "Usuario ${actual.usuario}: " + detalle.joinToString(", "))
             leerUsuario(cx, id)
