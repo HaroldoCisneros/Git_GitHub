@@ -90,6 +90,10 @@ class BaseDatos(private val config: ConfigConexion) {
             codigo == 229 || codigo == 230 -> Resultado.Error(
                 "El usuario de SQL Server no tiene permiso para esta operación (ver sql/03_permisos_usuario_sql.sql).",
                 TipoError.PERMISO)
+            // Columna que no existe: la base de la App es de una versión anterior de los scripts
+            codigo == 207 -> Resultado.Error(
+                "A la base $base le falta una columna (${e.message}). Si es la base de la App, ejecute de nuevo " +
+                    "COMPLETO sql/02_tablas.sql (solo agrega lo que falta).", TipoError.SERVIDOR)
             codigo == 208 -> Resultado.Error(
                 "Falta una tabla en la base $base: ${e.message}. Revise los nombres en parametros.", TipoError.SERVIDOR)
             else -> Resultado.Error("Error de SQL Server: ${e.message}", TipoError.SERVIDOR)

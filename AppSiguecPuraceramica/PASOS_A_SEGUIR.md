@@ -28,7 +28,9 @@ Ejecutar en este orden (carpeta `sql/`):
    no la tiene, ejecute antes `05_funcion_ultimo_costo.sql`).
    (Registrar la empresa y dársela al ADMIN ya NO se hace a mano: lo hace la App al
    guardar la Configuración del teléfono, Paso 4.)
-4. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
+4. **¿No hay usuario para entrar?** `07_crear_admin.sql` crea (o reinicia) **ADMIN / cambiar123**
+   como administrador con todas las empresas. Sirve también si se olvidó la clave de ADMIN.
+5. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
    los nombres de las tablas de Profit.
 
 > Si ya había ejecutado los scripts antes, vuelva a ejecutar `02_tablas.sql` y
@@ -133,6 +135,8 @@ guardado); solo va al servidor si el teléfono no lo conoce o si el permiso se l
 
 | Mensaje | Qué revisar |
 |---|---|
+| "El nombre de columna 'puede_configurar' no es válido" / "le falta una columna" | La base se creó con scripts anteriores: ejecute de nuevo **completo** `02_tablas.sql` (F5 sin seleccionar nada; solo agrega lo que falta). |
+| "Usuario o clave incorrectos" la primera vez / no hay usuarios | `07_crear_admin.sql` → ADMIN / cambiar123 (la primera entrada con WiFi). |
 | "No se pudo conectar con el servidor..." | WiFi de la empresa, IP/puerto en Configuración, TCP/IP habilitado, firewall. |
 | "El usuario o la clave de SQL Server no son correctos" | Paso 1.3 y Configuración; autenticación mixta. |
 | "No se pudo abrir la base ..." | Nombre de la base de la App o de la empresa (tabla `empresas`). |

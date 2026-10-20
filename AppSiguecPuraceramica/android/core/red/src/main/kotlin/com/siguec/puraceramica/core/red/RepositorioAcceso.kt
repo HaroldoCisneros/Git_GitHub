@@ -24,11 +24,11 @@ private const val INTENTOS_MAXIMOS = 5
 private const val MINUTOS_BLOQUEO = 15
 private const val MENSAJE_INCORRECTO = "Usuario o clave incorrectos."
 
-// "a.*": si en el futuro se agregan permisos, la entrada no falla con una base vieja
-private const val SQL_USUARIO = """SELECT id, usuario, nombre, clave_hash, usuario_profit, es_administrador, puede_configurar,
-    activo, intentos_fallidos, bloqueado_hasta, CASE WHEN bloqueado_hasta > GETDATE() THEN 1 ELSE 0 END AS bloqueado,
-    CONVERT(varchar(5), bloqueado_hasta, 108) AS hora_desbloqueo
-    FROM dbo.usuarios WHERE usuario = ?"""
+// "u.*" y "a.*": si a la base le falta una columna nueva (ej. puede_configurar, si no se volvió a
+// ejecutar sql/02), la entrada no falla: la columna que falta se toma como 0
+private const val SQL_USUARIO = """SELECT u.*, CASE WHEN u.bloqueado_hasta > GETDATE() THEN 1 ELSE 0 END AS bloqueado,
+    CONVERT(varchar(5), u.bloqueado_hasta, 108) AS hora_desbloqueo
+    FROM dbo.usuarios u WHERE u.usuario = ?"""
 private const val SQL_AMBIENTES = """SELECT a.*, e.nombre FROM dbo.ambientes a
     JOIN dbo.empresas e ON e.co_empresa = a.co_empresa
     WHERE a.usuario_id = ? AND a.activo = 1 AND e.activa = 1 ORDER BY e.nombre"""

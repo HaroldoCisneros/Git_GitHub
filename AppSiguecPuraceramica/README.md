@@ -136,7 +136,8 @@ cuentan el mismo inventario, cada uno envía **su propio resultado**.
 1. **SQL Server Management Studio**: `sql/01_crear_base.sql`, `sql/02_tablas.sql`
    (crea el usuario **ADMIN / cambiar123**: cámbiele la clave al entrar),
    `sql/03_permisos_usuario_sql.sql` (**crea el usuario de SQL `siguec_puraceramica`**; cambie
-   la clave), y para revisar los nombres `sql/04_consultas_verificacion.sql`.
+   la clave), y para revisar los nombres `sql/04_consultas_verificacion.sql`. Si no hay usuario
+   para entrar: `sql/07_crear_admin.sql` (ADMIN / cambiar123).
 2. **Android Studio**: abrir `android/` y compilar. En el teléfono: Configuración →
    datos del SQL Server y base de Profit (ej. `SAPURA_A`) → Probar conexión → moneda →
    Guardar (registra la empresa en la App para el ADMIN). Entrar con ADMIN y crear los
