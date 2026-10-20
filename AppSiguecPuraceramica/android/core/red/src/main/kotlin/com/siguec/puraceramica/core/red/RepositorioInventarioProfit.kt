@@ -103,7 +103,8 @@ class RepositorioInventarioProfit(
             descripcion = "App ${usuario.usuario} ${acceso.dispositivo}",
             coUsuario = toma.coUsProfit,
             coSucursal = toma.coSucuProfit,
-            totales = totales
+            totales = totales,
+            maquina = acceso.dispositivo
         ))
         acceso.anotarDesde(cx, Acciones.ENVIAR_TOMA, usuario, coEmpresa,
             "Inventario ${toma.numero}, resultado $numResinv: ${totales.size} artículos, ${renglones.size} conteos")

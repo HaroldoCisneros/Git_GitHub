@@ -50,5 +50,9 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 - Moneda del resultado (`profit.co_mone`).
 - **Correlativo de Profit para num_resinv**: el usuario está averiguando la tabla de
   consecutivos; mientras tanto queda 'APP' + número del envío.
+- **Procedimiento del encabezado del resultado** (`pInsertarResInventario`): el usuario pasó
+  pInsertarRenglonesResInventario (ya en uso para los renglones) y pInsertarInventarioFisico
+  (es el del inventario físico, no del resultado). Mientras tanto el encabezado va con INSERT
+  + EXEC pInsertarPista (mismo patrón de Softech).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
   :core:red sí se compiló y probó: 17 pruebas OK).

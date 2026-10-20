@@ -101,6 +101,10 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 | `cost_unit` | `dbo.ConsultarUltimoCosto(saArticulo.rowguid)`: último costo de entrada (sin REPO ni PROV) |
 | `sco_uni`, `stotal_art_teo`, `stotal_art` | NULL / 0 / 0 |
 
+Los **renglones** se graban con el procedimiento de Profit `pInsertarRenglonesResInventario`
+y el **encabezado** con INSERT + `pInsertarPista`: así todo queda en la **pista de auditoría
+de Profit** (con el teléfono como máquina), igual que si se cargara en Profit.
+
 Uso normal: **un teléfono por almacén / inventario abierto**. Si varios teléfonos
 cuentan el mismo inventario, cada uno envía **su propio resultado**.
 

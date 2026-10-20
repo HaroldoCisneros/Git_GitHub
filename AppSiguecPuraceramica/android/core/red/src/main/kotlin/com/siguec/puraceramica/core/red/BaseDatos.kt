@@ -119,6 +119,21 @@ class Conexion internal constructor(private val jdbc: Connection, val base: Stri
     /** INSERT / UPDATE / DELETE. Devuelve las filas afectadas. */
     fun ejecutar(sql: String, vararg parametros: Any?): Int = preparar(sql, parametros).use { it.executeUpdate() }
 
+    /**
+     * Ejecuta un procedimiento almacenado de Profit (EXEC ...) y descarta lo que devuelva
+     * (los de Softech terminan con un SELECT de control).
+     */
+    fun ejecutarProcedimiento(sql: String, vararg parametros: Any?) {
+        preparar(sql, parametros).use { st ->
+            var hayResultado = st.execute()
+            // Se leen y descartan todos los resultados para que el procedimiento termine completo
+            while (hayResultado || st.updateCount != -1) {
+                if (hayResultado) st.resultSet.use { rs -> while (rs.next()) Unit }
+                hayResultado = st.moreResults
+            }
+        }
+    }
+
     /** El mismo INSERT para muchas filas, en bloques (sincronización, envío del conteo). */
     fun ejecutarLote(sql: String, filas: List<List<Any?>>, tamanoBloque: Int = 500) {
         if (filas.isEmpty()) return

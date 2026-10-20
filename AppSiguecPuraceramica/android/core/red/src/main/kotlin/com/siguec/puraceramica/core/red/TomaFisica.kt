@@ -30,7 +30,8 @@ data class EnvioProfit(
     val descripcion: String,
     val coUsuario: String,
     val coSucursal: String,
-    val totales: Map<String, BigDecimal>
+    val totales: Map<String, BigDecimal>,
+    val maquina: String = ""    // Teléfono (queda en la pista de Profit, @sMaquina)
 )
 
 /** Lo que la App necesita de la toma física de Profit. Se usa DENTRO de una conexión a la empresa. */
@@ -63,6 +64,8 @@ interface TomaFisicaProfit {
  *                        cost_unit (= dbo.ConsultarUltimoCosto(saArticulo.rowguid)), co_us_in/mo,
  *                        co_sucu_in/mo, fe_us_in/mo.
  *                        (validador = timestamp y rowguid = newid() los pone SQL Server)
+ *   pInsertarRenglonesResInventario  Procedimiento de Softech que graba cada renglón y su pista.
+ *   pInsertarPista                   Auditoría de Profit (se llama para el encabezado).
  */
 object TomaFisica2K12 : TomaFisicaProfit {
 
@@ -79,14 +82,23 @@ object TomaFisica2K12 : TomaFisicaProfit {
     private const val SQL_ULTIMA_MONEDA =
         "SELECT TOP 1 RTRIM(co_mone) AS co_mone FROM dbo.saResInventario ORDER BY fe_us_in DESC"
 
-    private const val SQL_ENCABEZADO = """INSERT INTO dbo.saResInventario (num_resinv, des_resinv, fecha, co_invfisico, co_alma,
-        co_mone, tasa, co_us_in, co_sucu_in, fe_us_in, co_us_mo, co_sucu_mo, fe_us_mo)
-        VALUES (?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, GETDATE())"""
+    // Encabezado: INSERT + pista de auditoría de Profit (igual que hacen los procedimientos de Softech).
+    // OUTPUT devuelve la fecha y el rowguid que pone SQL Server, para la pista.
+    private const val SQL_ENCABEZADO = """SET NOCOUNT ON;
+        DECLARE @t TABLE (fe_us_in datetime, rowguid uniqueidentifier);
+        INSERT INTO dbo.saResInventario (num_resinv, des_resinv, fecha, co_invfisico, co_alma,
+            co_mone, tasa, co_us_in, co_sucu_in, fe_us_in, co_us_mo, co_sucu_mo, fe_us_mo)
+        OUTPUT inserted.fe_us_in, inserted.rowguid INTO @t
+        VALUES (?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, GETDATE());
+        SELECT fe_us_in, CAST(rowguid AS char(36)) AS rowguid FROM @t"""
 
-    private const val SQL_RENGLON = """INSERT INTO dbo.saResInventarioReng (num_resinv, reng_num, co_art, co_uni, sco_uni,
-        total_art_teo, total_art, stotal_art_teo, stotal_art, cost_unit, co_us_in, co_sucu_in, fe_us_in,
-        co_us_mo, co_sucu_mo, fe_us_mo)
-        VALUES (?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?, ?, GETDATE(), ?, ?, GETDATE())"""
+    private const val SQL_PISTA = """EXEC dbo.pInsertarPista @sUsuario_Id = ?, @dtFecha = ?, @sCo_Sucu = ?,
+        @sTablaOri = 'saResInventario', @rowguidOri = ?, @sTipo_Op = 'I', @sMaquina = ?, @sCampos = ?"""
+
+    // Renglones: el procedimiento de Profit (graba el renglón y su pista)
+    private const val SQL_RENGLON = """EXEC dbo.pInsertarRenglonesResInventario @sNum_ResInv = ?, @iReng_Num = ?,
+        @sCo_Art = ?, @sCo_Uni = ?, @sSco_Uni = NULL, @deTotal_Art_Teo = ?, @deTotal_Art = ?, @deStotal_Art = 0,
+        @deSTotal_Art_Teo = 0, @deCost_Unit = ?, @sCo_Us_In = ?, @sCo_Sucu_In = ?, @sMaquina = ?"""
 
     /** Cuántos artículos por consulta "IN (?, ?, ...)" (SQL Server admite 2100 parámetros). */
     private const val LOTE = 500
@@ -137,14 +149,20 @@ object TomaFisica2K12 : TomaFisicaProfit {
         val us = registro.first.take(6)
         val sucu = registro.second.take(6).ifEmpty { null }
 
-        // Encabezado
-        cx.ejecutar(SQL_ENCABEZADO, envio.numResinv, envio.descripcion.take(60), envio.numero, envio.coAlma, moneda,
-            BigDecimal(cfg.tasa), us, sucu, us, sucu)
-        // Renglones: uno por artículo (UK num_resinv + co_art), numerados desde 1
-        cx.ejecutarLote(SQL_RENGLON, codigos.mapIndexed { i, coArt ->
-            listOf(envio.numResinv, i + 1, coArt, unidades.getValue(coArt), teorico[coArt] ?: BigDecimal.ZERO,
-                envio.totales.getValue(coArt), costos[coArt] ?: BigDecimal.ZERO, us, sucu, us, sucu)
-        })
+        val maquina = envio.maquina.take(60)
+
+        // Encabezado + su pista
+        val creado = cx.consultarUno(SQL_ENCABEZADO, envio.numResinv, envio.descripcion.take(60), envio.numero,
+            envio.coAlma, moneda, BigDecimal(cfg.tasa), us, sucu, us, sucu)
+            ?: throw ErrorApp("Profit no devolvió el resultado de inventario creado.", TipoError.SERVIDOR)
+        cx.ejecutarProcedimiento(SQL_PISTA, us, creado["fe_us_in"], sucu, creado["rowguid"], maquina, envio.numResinv)
+
+        // Renglones: uno por artículo (UK num_resinv + co_art), numerados desde 1, con el procedimiento de Profit
+        codigos.forEachIndexed { i, coArt ->
+            cx.ejecutarProcedimiento(SQL_RENGLON, envio.numResinv, i + 1, coArt, unidades.getValue(coArt),
+                teorico[coArt] ?: BigDecimal.ZERO, envio.totales.getValue(coArt), costos[coArt] ?: BigDecimal.ZERO,
+                us, sucu, maquina)
+        }
     }
 
     /**

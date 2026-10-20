@@ -20,7 +20,8 @@ Ejecutar en este orden (carpeta `sql/`):
    Crea el usuario de SQL `siguec_puraceramica` con lo mínimo: su base, solo lectura en
    `saArticulo`, `saInventarioFisico`, `saAlmacen`, `saArtUnidad` y `saStockAlmacen`, e
    INSERT en `saResInventario` y `saResInventarioReng` (el resultado de lo contado), y
-   EXECUTE en la función `ConsultarUltimoCosto` (costo unitario de cada renglón; si su base
+   EXECUTE en los procedimientos de Profit `pInsertarRenglonesResInventario` y
+   `pInsertarPista` (así queda la pista de auditoría de Profit), y en la función `ConsultarUltimoCosto` (costo unitario de cada renglón; si su base
    no la tiene, ejecute antes `05_funcion_ultimo_costo.sql`).
 4. **Registrar la empresa** (use el nombre real de la base):
    ```sql
