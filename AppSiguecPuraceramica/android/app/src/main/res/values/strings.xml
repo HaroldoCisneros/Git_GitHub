@@ -2,5 +2,5 @@
 <!-- Textos de la app. Tenerlos aquí facilita cambiarlos o traducirlos. -->
 <resources>
     <!-- Nombre que aparece debajo del ícono -->
-    <string name="app_name">AppSiguecPuraceramica</string>
+    <string name="app_name">Conteo de Inventario Puraceramica</string>
 </resources>

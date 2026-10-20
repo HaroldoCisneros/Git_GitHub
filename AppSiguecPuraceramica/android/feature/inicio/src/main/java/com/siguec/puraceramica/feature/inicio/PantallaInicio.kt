@@ -44,7 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 // Componentes compartidos
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
-import com.siguec.puraceramica.core.ui.componentes.LogoSiguec
+import com.siguec.puraceramica.core.ui.componentes.LogoBarraPuraceramica
 
 /**
  * Menú principal (después de entrar y elegir la empresa).
@@ -85,7 +85,7 @@ fun PantallaInicio(
     Scaffold(
         topBar = {
             BarraSuperior(
-                titulo = "AppSiguecPuraceramica",
+                titulo = "Conteo de Inventario",
                 subtitulo = nombreEmpresa,
                 acciones = {
                     // Cerrar sesión: vuelve a la pantalla de usuario y clave
@@ -108,7 +108,8 @@ fun PantallaInicio(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            LogoSiguec(Modifier.fillMaxWidth())
+            // Logo horizontal de Puracerámica arriba del menú
+            LogoBarraPuraceramica(Modifier.fillMaxWidth())
             Text("Hola, $nombreUsuario", style = MaterialTheme.typography.headlineSmall)
             Text("Toma de inventario", style = MaterialTheme.typography.bodyLarge)
             if (sinConexion) {

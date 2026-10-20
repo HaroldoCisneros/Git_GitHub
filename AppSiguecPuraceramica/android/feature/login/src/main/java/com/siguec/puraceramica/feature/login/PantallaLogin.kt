@@ -67,11 +67,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 // Sesión y componentes compartidos
 import com.siguec.puraceramica.core.sesion.GestorSesion
 import com.siguec.puraceramica.core.ui.componentes.BarraSuperior
-import com.siguec.puraceramica.core.ui.componentes.LogoSiguec
+import com.siguec.puraceramica.core.ui.componentes.LogoPuraceramica
 import com.siguec.puraceramica.core.ui.tema.ColoresMarca
 
 /**
- * Pantalla de entrada de AppSiguecPuraceramica.
+ * Pantalla de entrada de Conteo de Inventario Puraceramica.
  *  1. Al abrir: si quedó una sesión abierta, entra sola (aunque no haya WiFi).
  *  2. Si no: pide usuario y clave. Con WiFi se verifica en el SQL Server; sin WiFi,
  *     con la clave de la última vez que ese usuario entró en este teléfono.
@@ -98,7 +98,8 @@ fun PantallaLogin(gestor: GestorSesion, alEntrar: () -> Unit, alConfigurar: () -
     Scaffold(
         topBar = {
             BarraSuperior(
-                titulo = if (estado.paso == PasoLogin.EMPRESA) "Elija la empresa" else "AppSiguecPuraceramica",
+                titulo = if (estado.paso == PasoLogin.EMPRESA) "Elija la empresa" else "Conteo de Inventario",
+                subtitulo = "Puraceramica",
                 acciones = {
                     // Configuración: datos de la conexión con el SQL Server
                     IconButton(onClick = alConfigurar) {
@@ -145,8 +146,9 @@ private fun Credenciales(estado: EstadoLogin, vm: LoginViewModel, alConfigurar: 
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        LogoSiguec(Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
+        // Logo de Puracerámica con el nombre de la App
+        LogoPuraceramica(Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
         Text("Toma de inventario con Profit Plus 2K12", style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(28.dp))

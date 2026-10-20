@@ -1,7 +1,7 @@
 // =====================================================================
 // MÓDULO :core:ui
 // Elementos visuales compartidos por todas las pantallas: tema, colores
-// de la marca SIGUEC, barra superior y componentes comunes.
+// y logos de Puracerámica, barra superior y componentes comunes.
 // =====================================================================
 
 plugins {

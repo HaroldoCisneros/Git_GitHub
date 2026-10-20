@@ -52,7 +52,7 @@ fun BarraSuperior(
                         Text(
                             it,
                             style = MaterialTheme.typography.labelMedium,
-                            color = ColoresMarca.Azul,
+                            color = ColoresMarca.Blanco.copy(alpha = 0.8f), // Blanco suave sobre el rojo
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -68,15 +68,15 @@ fun BarraSuperior(
                 }
             },
             actions = acciones,
-            // Fondo negro y textos/íconos blancos
+            // Fondo rojo de la marca (el del logo horizontal) y textos/íconos blancos
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = ColoresMarca.Negro,
+                containerColor = ColoresMarca.RojoBarra,
                 titleContentColor = ColoresMarca.Blanco,
                 navigationIconContentColor = ColoresMarca.Blanco,
                 actionIconContentColor = ColoresMarca.Blanco
             )
         )
-        // Franja roja, azul y naranja debajo de la barra
+        // Franja roja debajo de la barra
         FranjaMarca()
     }
 }

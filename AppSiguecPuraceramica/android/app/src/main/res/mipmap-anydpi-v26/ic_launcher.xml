@@ -2,8 +2,8 @@
 <!-- Ícono adaptativo (Android 8 en adelante): una capa de fondo y una delantera.
      El teléfono le da la forma (círculo, cuadrado redondeado, etc.). -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Fondo negro, como la barra de la app -->
+    <!-- Fondo blanco, como el del logo -->
     <background android:drawable="@color/fondo_icono" />
-    <!-- Ficha de inventario con la franja de colores SIGUEC -->
+    <!-- Símbolo del logo de Puracerámica (drawable-nodpi/ic_launcher_foreground.png) -->
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
 </adaptive-icon>

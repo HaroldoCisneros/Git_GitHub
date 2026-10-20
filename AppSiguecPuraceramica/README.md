@@ -2,7 +2,7 @@
 
 **Empiece por [PASOS_A_SEGUIR.md](PASOS_A_SEGUIR.md).**
 
-App Android (Kotlin, Jetpack Compose) **solo para el conteo del inventario**
+App Android **Conteo de Inventario Puraceramica** (Kotlin, Jetpack Compose) **solo para el conteo del inventario**
 (toma física) contra **Profit Plus 2K12**. Modular y comentada, con la misma
 estructura y la misma lógica de usuarios y accesos de **AppSighecMovil**.
 
@@ -136,7 +136,8 @@ android/
                         (saArticulo), RepositorioInventarioProfit, TomaFisica (saInventarioFisico y saResInventario), Logica
   core/local/           Base del teléfono (SQLite): ArticulosLocales, InventariosLocales
   core/sesion/          Configuración, sesión, usuarios recordados (entrar sin WiFi)
-  core/ui/              Tema, barra, estados y escáner (Google Code Scanner)
+  core/ui/              Tema (rojos del logo), logos de Puracerámica (res/drawable-nodpi),
+                        barra, estados y escáner (Google Code Scanner)
   feature/login         Entrada, Configuración de la conexión, elegir empresa
   feature/inicio        Menú
   feature/articulos     Consultar y sincronizar

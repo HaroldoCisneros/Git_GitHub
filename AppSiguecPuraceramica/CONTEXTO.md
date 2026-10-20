@@ -44,6 +44,10 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     saStockAlmacen; cost_unit = dbo.ConsultarUltimoCosto(saArticulo.rowguid) (función de la
     empresa, sql/05; parámetro profit.funcion_costo).
 
+11. **Imagen**: nombre visible "Conteo de Inventario Puraceramica" (pedido del usuario). Logos de
+    Puracerámica: el completo en la entrada, el horizontal arriba del menú, el símbolo en el
+    ícono de la App; barras en el rojo del logo (core/ui: Marca.kt y Tema.kt).
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).

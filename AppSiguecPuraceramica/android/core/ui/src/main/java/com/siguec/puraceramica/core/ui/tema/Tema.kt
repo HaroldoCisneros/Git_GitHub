@@ -12,14 +12,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
- * Colores de la marca SIGUEC (los mismos de AppSighecMovil y Control de Visitas).
+ * Colores de la marca Puracerámica (tomados de su logo).
  * Formato 0xAARRGGBB: transparencia, rojo, verde, azul.
  */
 object ColoresMarca {
-    val Rojo = Color(0xFFD11826)      // Franja roja
-    val Azul = Color(0xFF6FA3D8)      // Franja azul
-    val Naranja = Color(0xFFF19B1C)   // Franja naranja
-    val Negro = Color(0xFF000000)     // Barras superiores y letras
+    val Rojo = Color(0xFFCE2916)      // Rojo del círculo del logo: botones y franja
+    val RojoOscuro = Color(0xFF8D1516) // Rojo oscuro de la "ola" del logo
+    val RojoBarra = Color(0xFF9A0410) // Fondo del logo horizontal: barras superiores
+    val Azul = Color(0xFF6FA3D8)      // Acento secundario
+    val Naranja = Color(0xFFF19B1C)   // Avisos
+    val Negro = Color(0xFF000000)     // Letras
     val Blanco = Color(0xFFFFFFFF)    // Fondo
     val GrisClaro = Color(0xFFF4F5F7) // Fondo suave de tarjetas
     val Gris = Color(0xFF6B7280)      // Textos secundarios (etiquetas)
@@ -30,8 +32,8 @@ object ColoresMarca {
 private val ColoresApp = lightColorScheme(
     primary = ColoresMarca.Rojo,             // Botones principales
     onPrimary = ColoresMarca.Blanco,         // Texto encima del rojo
-    secondary = ColoresMarca.Azul,           // Elementos secundarios
-    onSecondary = ColoresMarca.Negro,
+    secondary = ColoresMarca.RojoOscuro,     // Elementos secundarios
+    onSecondary = ColoresMarca.Blanco,
     tertiary = ColoresMarca.Naranja,         // Acentos (avisos)
     onTertiary = ColoresMarca.Negro,
     background = ColoresMarca.Blanco,        // Fondo de las pantallas
