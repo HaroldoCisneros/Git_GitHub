@@ -181,6 +181,10 @@ data class AmbienteAdminDto(
 )
 
 /** Un usuario de la App visto por el administrador. */
+/** Moneda de Profit (saMoneda) para elegir en Configuración; [cambio] = tasa actual. */
+@Serializable
+data class MonedaDto(val coMone: String, val descripcion: String, val cambio: String)
+
 data class UsuarioAdminDto(
     val id: Int,
     val usuario: String,

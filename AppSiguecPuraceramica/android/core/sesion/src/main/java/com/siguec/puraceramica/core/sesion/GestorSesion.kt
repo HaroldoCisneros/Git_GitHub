@@ -10,6 +10,7 @@ import com.siguec.puraceramica.core.local.AlmacenLocal
 import com.siguec.puraceramica.core.red.AmbienteDto
 import com.siguec.puraceramica.core.red.BaseDatos
 import com.siguec.puraceramica.core.red.ConfigConexion
+import com.siguec.puraceramica.core.red.MonedaDto
 import com.siguec.puraceramica.core.red.RepositorioAcceso
 import com.siguec.puraceramica.core.red.RepositorioAdmin
 import com.siguec.puraceramica.core.red.RepositorioInventarioProfit
@@ -77,6 +78,10 @@ class GestorSesion(contexto: Context) {
     /** Prueba una configuración (sin guardarla). */
     suspend fun probarConexion(config: ConfigConexion): Resultado<String> =
         RepositorioAcceso(BaseDatos(config), dispositivo).probar()
+
+    /** Monedas de Profit para elegir en Configuración (con lo escrito, sin guardarlo). */
+    suspend fun monedas(config: ConfigConexion): Resultado<List<MonedaDto>> =
+        RepositorioAcceso(BaseDatos(config), dispositivo).monedas()
 
     private fun bd() = BaseDatos(almacen.conexion)
     private fun acceso() = RepositorioAcceso(bd(), dispositivo)
@@ -161,7 +166,7 @@ class GestorSesion(contexto: Context) {
 
     /** Consultar y abrir los inventarios físicos de Profit, y enviar lo contado. */
     fun inventarioProfit(): RepositorioInventarioProfit =
-        bd().let { RepositorioInventarioProfit(it, RepositorioAcceso(it, dispositivo)) }
+        bd().let { RepositorioInventarioProfit(it, RepositorioAcceso(it, dispositivo), almacen.conexion.coMone) }
 
     /** Administración de usuarios (null sin sesión). */
     fun admin(): RepositorioAdmin? = usuario?.let { RepositorioAdmin(bd(), it, dispositivo) }

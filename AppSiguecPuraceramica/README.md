@@ -43,8 +43,9 @@ misma **clave de envío** y SQL Server no lo recibe dos veces.
 
 ## Configuración (botón en la entrada y en el menú)
 
-Servidor (IP o nombre), puerto (1433) o instancia, usuario y clave de SQL Server, y
-base de la App. "Probar conexión" verifica sin guardar. La clave de SQL guardada
+Servidor (IP o nombre), puerto (1433) o instancia, usuario y clave de SQL Server,
+base de la App y **moneda del resultado de inventario** (se elige una vez de `saMoneda`
+de Profit con "Buscar monedas en Profit"; la tasa es su `cambio` al enviar). "Probar conexión" verifica sin guardar. La clave de SQL guardada
 **nunca se muestra** (solo se puede escribir una nueva).
 
 **Seguridad de la conexión directa** (decisión tomada): la clave del usuario de SQL
@@ -92,7 +93,7 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 | `des_resinv` | `App <usuario> <teléfono>` |
 | `fecha`, `fe_us_in`, `fe_us_mo` | Hora del servidor |
 | `co_invfisico`, `co_alma` | Los del inventario abierto (si el inventario no tiene almacén, no se puede enviar) |
-| `co_mone`, `tasa` | Parámetro `profit.co_mone` (si no está, la del último resultado grabado en Profit) y `profit.tasa` (1) |
+| `co_mone`, `tasa` | La moneda elegida en **Configuración** del teléfono (lista de `saMoneda`) y su `cambio` en Profit al momento de enviar |
 | `co_us_in/mo`, `co_sucu_in/mo` | Usuario y sucursal del **registro del inventario** en `saInventarioFisico` |
 | `saResInventarioReng.reng_num` | 1, 2, 3... (un renglón por artículo) |
 | `co_uni` | Unidad principal del artículo: `saArtUnidad.uni_principal = 1` |

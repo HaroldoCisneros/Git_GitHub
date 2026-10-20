@@ -16,6 +16,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 // Componentes de Material 3
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +29,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 // Modificadores y teclado
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -50,6 +54,7 @@ import com.siguec.puraceramica.core.ui.tema.ColoresMarca
  *  - Puerto (1433) o instancia (ej. SQLEXPRESS).
  *  - Usuario y clave de SQL Server de la App (sql/03_permisos_usuario_sql.sql).
  *  - Base de la App (SIGUEC_PURACERAMICA).
+ *  - Moneda del resultado de inventario (se elige de saMoneda de Profit; la tasa es su cambio).
  * "Probar conexión" se conecta con lo escrito sin guardarlo.
  */
 @Composable
@@ -91,6 +96,28 @@ fun PantallaConfiguracion(gestor: GestorSesion, alVolver: () -> Unit) {
             OutlinedTextField(estado.baseApp, vm::alCambiarBase, label = { Text("Base de la App") },
                 singleLine = true, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.fillMaxWidth())
+
+            // ---------- Moneda del resultado de inventario ----------
+            HorizontalDivider()
+            Text("Moneda del resultado de inventario", style = MaterialTheme.typography.titleSmall)
+            Text(if (estado.coMone.isEmpty()) "Sin elegir: búsquela en Profit y elija una (se hace una sola vez)."
+                else "Moneda: ${estado.coMone}. La tasa se toma del cambio de Profit al enviar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (estado.coMone.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = vm::buscarMonedas, enabled = !estado.probando, modifier = Modifier.fillMaxWidth()) {
+                Text("Buscar monedas en Profit")
+            }
+            // Una fila por moneda: tocarla la elige
+            estado.monedas.forEach { m ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.elegirMoneda(m) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(selected = m.coMone.equals(estado.coMone, ignoreCase = true), onClick = { vm.elegirMoneda(m) })
+                    Text("${m.coMone} · ${m.descripcion} · cambio ${m.cambio}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            HorizontalDivider()
 
             estado.mensajeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             estado.mensajeAviso?.let { Text(it, color = ColoresMarca.Verde) }

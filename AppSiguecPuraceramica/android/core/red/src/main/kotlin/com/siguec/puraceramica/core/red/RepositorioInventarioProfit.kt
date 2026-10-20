@@ -17,11 +17,13 @@ import java.math.BigDecimal
  * [claveEnvio] la genera el teléfono: si se reintenta un envío que sí llegó
  * (se cortó el WiFi justo al terminar), no se duplica.
  *
+ * @param coMone moneda del resultado, elegida en Configuración del teléfono
  * @param tomaFisica el SQL de la toma física de Profit (ver TomaFisica.kt)
  */
 class RepositorioInventarioProfit(
     private val bd: BaseDatos,
     private val acceso: RepositorioAcceso,
+    private val coMone: String = "",
     private val tomaFisica: TomaFisicaProfit = TomaFisicaProfit.actual
 ) {
     /** Los inventarios físicos sin procesar en Profit (procesado = 0). */
@@ -105,7 +107,8 @@ class RepositorioInventarioProfit(
             coUsuario = toma.coUsProfit,
             coSucursal = toma.coSucuProfit,
             totales = totales,
-            maquina = acceso.dispositivo
+            maquina = acceso.dispositivo,
+            coMone = coMone
         ))
         acceso.anotarDesde(cx, Acciones.ENVIAR_TOMA, usuario, coEmpresa,
             "Inventario ${toma.numero}, resultado $numResinv: ${totales.size} artículos, ${renglones.size} conteos")

@@ -14,6 +14,8 @@ import kotlinx.serialization.Serializable
  * @property usuario usuario de SQL Server de la App (siguec_puraceramica, ver sql/03)
  * @property clave su clave (se guarda solo en este teléfono, nunca se muestra)
  * @property baseApp base propia de la App con usuarios y permisos
+ * @property coMone moneda del resultado de inventario (saMoneda de Profit). Se elige una vez en
+ *           Configuración; la tasa se lee de saMoneda.cambio al enviar
  */
 @Serializable
 data class ConfigConexion(
@@ -22,7 +24,8 @@ data class ConfigConexion(
     val instancia: String = "",
     val usuario: String = "siguec_puraceramica",
     val clave: String = "",
-    val baseApp: String = "SIGUEC_PURACERAMICA"
+    val baseApp: String = "SIGUEC_PURACERAMICA",
+    val coMone: String = ""
 ) {
     /** ¿Están los datos mínimos? */
     val completa: Boolean get() = servidor.isNotBlank() && usuario.isNotBlank() && validarBase(baseApp) == null
@@ -51,6 +54,7 @@ data class ConfigConexion(
         puerto.isBlank() && instancia.isBlank() -> "Escriba el puerto o el nombre de la instancia"
         instancia.any { it == ';' } -> "La instancia no es válida"
         usuario.isBlank() -> "Escriba el usuario de SQL Server"
+        coMone.isNotEmpty() && !Regex("^[A-Za-z0-9$]{1,6}$").matches(coMone) -> "Código de moneda no válido: '$coMone'"
         else -> validarBase(baseApp)
     }
 

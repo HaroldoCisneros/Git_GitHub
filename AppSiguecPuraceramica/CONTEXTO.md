@@ -48,11 +48,14 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     Puracerámica: el completo en la entrada, el horizontal arriba del menú, el símbolo en el
     ícono de la App; barras en el rojo del logo (core/ui: Marca.kt y Tema.kt).
 
+12. **Moneda** (pedido del usuario): se elige una vez en Configuración del teléfono (lista de
+    saMoneda de Profit: co_mone, mone_des, cambio) y la tasa del resultado es saMoneda.cambio
+    al enviar. Se quitaron profit.co_mone / profit.tasa.
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
 - `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
-- Moneda del resultado (`profit.co_mone`).
 - Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
   (procedimientos de Softech, con pista de auditoría).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;

@@ -77,6 +77,23 @@ class RepositorioAcceso(private val bd: BaseDatos, val dispositivo: String) {
     }
 
     /**
+     * Monedas de Profit (saMoneda: co_mone, mone_des, cambio) para elegir en Configuración.
+     * Se leen de las bases de las empresas activas de la App (sin repetir el código).
+     */
+    suspend fun monedas(): Resultado<List<MonedaDto>> = bd.usar { cx ->
+        val bases = cx.consultar("SELECT co_empresa FROM dbo.empresas WHERE activa = 1 ORDER BY co_empresa")
+            .map { it.texto("co_empresa") }
+            .filter { ConfigConexion.validarBase(it) == null }   // Va dentro del SQL
+            .filter { cx.consultarUno("SELECT OBJECT_ID(?) AS id", "$it.dbo.saMoneda")?.get("id") != null }
+        if (bases.isEmpty()) throw ErrorApp("No se encontró la tabla saMoneda en las empresas de la App.", TipoError.NO_ENCONTRADO)
+        bases.flatMap { base ->
+            cx.consultar("SELECT RTRIM(co_mone) AS co_mone, RTRIM(mone_des) AS mone_des, cambio " +
+                "FROM [$base].dbo.saMoneda ORDER BY co_mone")
+                .map { MonedaDto(it.texto("co_mone"), it.texto("mone_des"), it.decimal("cambio").stripTrailingZeros().toPlainString()) }
+        }.distinctBy { it.coMone.uppercase() }
+    }
+
+    /**
      * Usuario + clave.
      * El error se lanza DESPUÉS de grabar el contador de fallos y la bitácora: por eso
      * el bloque devuelve el mensaje en vez de lanzar ErrorApp (lanzarlo desharía todo).

@@ -32,9 +32,6 @@ data class ConfigProfit(
     // empresa dbo.psObtenerProximoNumero (último num_resinv + 1). Prefijo opcional ("" = solo números)
     val prefijoResultado: String = "",
     val procedimientoNumero: String = "psObtenerProximoNumero",
-    // Moneda y tasa del resultado ("" = la del último saResInventario grabado en Profit)
-    val coMone: String = "",
-    val tasa: String = "1",
     // Existencia teórica de cada renglón (saResInventarioReng.total_art_teo)
     val tablaStock: String = "saStockAlmacen",
     val colStockTipo: String = "tipo",          // "" = la tabla no tiene tipo
@@ -55,7 +52,6 @@ data class ConfigProfit(
             ?: tiposExcluidos.firstOrNull { !Regex("^[A-Z]$").matches(it) }?.let { "Tipo de artículo no válido: '$it'" }
             ?: prefijoResultado.takeUnless { Regex("^[A-Za-z0-9]{0,10}$").matches(it) }
                 ?.let { "Prefijo del resultado no válido: '$it' (solo letras y números, máximo 10)" }
-            ?: tasa.takeUnless { (it.toBigDecimalOrNull()?.signum() ?: 0) > 0 }?.let { "La tasa debe ser mayor que 0: '$it'" }
             ?: tipoStockActual.takeUnless { Regex("^[A-Za-z0-9]{0,6}$").matches(it) }?.let { "Tipo de stock no válido: '$it'" }
 
     companion object {
@@ -83,8 +79,6 @@ data class ConfigProfit(
                 colCodigoBarraArticulo = v("col_codigo_barra_articulo", d.colCodigoBarraArticulo),
                 prefijoResultado = v("prefijo_resultado", d.prefijoResultado),
                 procedimientoNumero = v("procedimiento_numero", d.procedimientoNumero),
-                coMone = v("co_mone", d.coMone),
-                tasa = v("tasa", d.tasa),
                 tablaStock = v("tabla_stock", d.tablaStock),
                 colStockTipo = v("col_stock_tipo", d.colStockTipo),
                 tipoStockActual = v("tipo_stock_actual", d.tipoStockActual),

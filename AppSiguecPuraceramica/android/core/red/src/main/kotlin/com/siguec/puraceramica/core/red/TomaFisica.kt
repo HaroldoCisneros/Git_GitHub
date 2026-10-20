@@ -22,6 +22,7 @@ import java.math.BigDecimal
  * @property coUsuario / coSucursal los del REGISTRO del inventario (saInventarioFisico.co_us_in /
  *           co_sucu_in), guardados al abrirlo: así queda igual que si se cargara en Profit
  * @property totales stock contado por artículo (suma de los conteos que se envían)
+ * @property coMone moneda elegida en Configuración del teléfono (la tasa es saMoneda.cambio)
  */
 data class EnvioProfit(
     val numero: String,
@@ -31,7 +32,8 @@ data class EnvioProfit(
     val coUsuario: String,
     val coSucursal: String,
     val totales: Map<String, BigDecimal>,
-    val maquina: String = ""    // Teléfono (queda en la pista de Profit, @sMaquina)
+    val maquina: String = "",   // Teléfono (queda en la pista de Profit, @sMaquina)
+    val coMone: String = ""
 )
 
 /** Lo que la App necesita de la toma física de Profit. Se usa DENTRO de una conexión a la empresa. */
@@ -83,8 +85,8 @@ object TomaFisica2K12 : TomaFisicaProfit {
     // co_invfisico es char(20): SQL Server compara sin los espacios de relleno
     private const val SQL_ABIERTA = "SELECT procesado FROM dbo.saInventarioFisico WHERE co_invfisico = ?"
 
-    private const val SQL_ULTIMA_MONEDA =
-        "SELECT TOP 1 RTRIM(co_mone) AS co_mone FROM dbo.saResInventario ORDER BY fe_us_in DESC"
+    // Tasa del resultado: el cambio de la moneda en Profit en el momento de enviar
+    private const val SQL_CAMBIO = "SELECT cambio FROM dbo.saMoneda WHERE co_mone = ?"
 
     // Encabezado: el procedimiento de Profit (graba el resultado y su pista de auditoría).
     // @sdFecha no admite GETDATE() directo en el EXEC: va en una variable (hora del servidor).
@@ -139,10 +141,17 @@ object TomaFisica2K12 : TomaFisicaProfit {
         }
         val teorico = stockTeorico(cx, cfg, envio.coAlma, codigos)
         val costos = ultimoCosto(cx, cfg, codigos)
-        val moneda = cfg.coMone.ifEmpty { cx.consultarUno(SQL_ULTIMA_MONEDA)?.texto("co_mone").orEmpty() }
+        // Moneda: la de Configuración del teléfono; tasa: su cambio actual en saMoneda
+        val moneda = envio.coMone.trim()
         if (moneda.isEmpty()) {
-            throw ErrorApp("No se sabe la moneda del resultado: agregue el parámetro profit.co_mone en " +
-                "SIGUEC_PURACERAMICA.dbo.parametros.", TipoError.VALIDACION)
+            throw ErrorApp("Falta la moneda del resultado: elíjala en Configuración (Buscar monedas en Profit).",
+                TipoError.VALIDACION)
+        }
+        val tasa = cx.consultarUno(SQL_CAMBIO, moneda)?.decimal("cambio")
+            ?: throw ErrorApp("La moneda $moneda no existe en Profit (saMoneda). Elija otra en Configuración.",
+                TipoError.VALIDACION)
+        if (tasa.signum() <= 0) {
+            throw ErrorApp("El cambio de la moneda $moneda en Profit es $tasa: debe ser mayor que 0.", TipoError.VALIDACION)
         }
         val us = registro.first.take(6)
         val sucu = registro.second.take(6).ifEmpty { null }
@@ -151,7 +160,7 @@ object TomaFisica2K12 : TomaFisicaProfit {
 
         // Encabezado (con su pista) con el procedimiento de Profit
         cx.ejecutarProcedimiento(SQL_ENCABEZADO, envio.numResinv, envio.descripcion.take(60), envio.numero,
-            envio.coAlma, moneda, BigDecimal(cfg.tasa), us, sucu, maquina)
+            envio.coAlma, moneda, tasa, us, sucu, maquina)
 
         // Renglones: uno por artículo (UK num_resinv + co_art), numerados desde 1, con el procedimiento de Profit
         codigos.forEachIndexed { i, coArt ->

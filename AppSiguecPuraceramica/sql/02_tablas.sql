@@ -92,7 +92,6 @@ GO
 /* ---------- parametros ----------
    Solo si en su Profit 2K12 algún nombre es distinto al de fábrica.
    Ejemplos:
-     INSERT INTO dbo.parametros VALUES ('profit.co_mone', 'BS');            -- Moneda del resultado
      INSERT INTO dbo.parametros VALUES ('profit.prefijo_resultado', 'INV'); -- Prefijo del correlativo (vacío = solo números)
    Claves válidas: ver android/core/red/.../ConfigProfit.kt                  */
 IF OBJECT_ID('dbo.parametros') IS NULL

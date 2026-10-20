@@ -37,12 +37,7 @@ Ejecutar en este orden (carpeta `sql/`):
       puede_contar_inventario, puede_cerrar_inventario)
    SELECT id, 'SAPURA_A', NULL, 1, 1, 1, 1 FROM SIGUEC_PURACERAMICA.dbo.usuarios WHERE usuario = 'ADMIN';
    ```
-6. **Moneda del resultado de inventario** (use el código de la moneda base de Profit):
-   ```sql
-   INSERT INTO SIGUEC_PURACERAMICA.dbo.parametros (clave, valor) VALUES ('profit.co_mone', 'BS');
-   ```
-   (Si no se pone, se toma la del último resultado de inventario grabado en Profit.)
-7. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
+6. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
    los nombres de las tablas de Profit.
 
 > Si ya había ejecutado los scripts antes, vuelva a ejecutar `02_tablas.sql` y
@@ -77,10 +72,13 @@ Ejecutar en este orden (carpeta `sql/`):
 2. Escriba: **Servidor** (IP del SQL Server), **Puerto** `1433` (o la **Instancia**),
    **Usuario** `siguec_puraceramica`, la **Clave** del Paso 1.3 y **Base de la App**
    `SIGUEC_PURACERAMICA`.
-3. **Probar conexión** → debe decir "Conexión correcta". Luego **Guardar**.
-4. Entre con **ADMIN / cambiar123** y en **Usuarios y permisos → ADMIN → Cambiar clave**
+3. **Probar conexión** → debe decir "Conexión correcta".
+4. **Moneda del resultado de inventario** → **Buscar monedas en Profit** (lista `saMoneda`)
+   → toque la moneda (ej. Bolívares). Se hace una sola vez. Luego **Guardar**.
+   Al enviar, la tasa se toma del **cambio** de esa moneda en Profit en ese momento.
+5. Entre con **ADMIN / cambiar123** y en **Usuarios y permisos → ADMIN → Cambiar clave**
    póngale una clave nueva.
-5. Cree los usuarios de los que cuentan (**Usuarios y permisos → +**) y deles la empresa
+6. Cree los usuarios de los que cuentan (**Usuarios y permisos → +**) y deles la empresa
    con sus permisos:
    - *Consultar artículos*, *Contar*: los que cuentan.
    - *Sincronizar artículos*, *Cerrar (enviar a Profit)*: el encargado.
@@ -122,7 +120,7 @@ Ejecutar en este orden (carpeta `sql/`):
 | "No se pudo abrir la base ..." | Nombre de la base de la App o de la empresa (tabla `empresas`). |
 | "El usuario de SQL Server no tiene permiso..." | Volver a ejecutar `03_permisos_usuario_sql.sql` con la base correcta. |
 | "No hay ningún artículo con el código..." | Sincronizar artículos; revisar que el código esté en co_art, modelo o ref. |
-| "No se sabe la moneda del resultado" | Paso 1.6 (`profit.co_mone`). |
+| "Falta la moneda del resultado" / "La moneda X no existe en Profit" | Paso 4.4: Configuración → Buscar monedas en Profit → elegirla → Guardar. |
 | "Estos artículos no tienen unidad en Profit" | Asignarles unidad en Profit (saArtUnidad). |
 | "No existe el procedimiento dbo.psObtenerProximoNumero" | Ejecutar `sql/06_procedimiento_proximo_numero.sql` y luego `03_permisos_usuario_sql.sql`. |
 | "No existe la función dbo.ConsultarUltimoCosto" | Ejecutar `sql/05_funcion_ultimo_costo.sql` y luego `03_permisos_usuario_sql.sql`. |
