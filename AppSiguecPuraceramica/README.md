@@ -1,4 +1,6 @@
-# AppSiguecPuraceramica
+# AppConteodeInventarioPura (AppSiguecPuraceramica)
+
+**Empiece por [PASOS_A_SEGUIR.md](PASOS_A_SEGUIR.md).**
 
 App Android (Kotlin, Jetpack Compose) **solo para el conteo del inventario**
 (toma física) contra **Profit Plus 2K12**. Modular y comentada, con la misma
@@ -26,7 +28,7 @@ intermedio) y **solo** para:
 | **Entrar** | Verifica usuario y clave en `SIGUEC_PURACERAMICA` (misma lógica de AppSighecMovil: PBKDF2, 5 claves erradas = 15 min bloqueado). **Sin WiFi** entra con la clave de la última vez que ese usuario entró con WiFi en ese teléfono. | — |
 | **Sincronizar artículos** | Baja `saArticulo` (código, descripción, anulado, modelo, ref; sin los servicios `tipo = 'S'`) al teléfono, con los códigos para escanear. | `sincronizar_articulos` |
 | **Abrir inventario** | Consulta en Profit los inventarios físicos creados y sin procesar (`saInventarioFisico.procesado = 0`, con el nombre del almacén de `saAlmacen`). Se elige uno, se ven sus datos y se toca **Abrir**: queda en el teléfono con el **usuario y la hora** (también en `SIGUEC_PURACERAMICA.dbo.aperturas` y la bitácora). | `contar_inventario` |
-| **Enviar (cerrar)** | Manda lo contado a la **toma física de Profit** (y deja auditoría en `envios` / `envio_conteos`). Profit se encarga de cerrarla. | `cerrar_inventario` |
+| **Enviar (cerrar)** | Graba lo contado como **resultado de inventario** en Profit: `saResInventario` (encabezado) + `saResInventarioReng` (un renglón por artículo con la suma de los conteos), con el **usuario y la sucursal del registro del inventario** (`saInventarioFisico.co_us_in` / `co_sucu_in`, guardados al abrirlo). Queda auditoría en `envios` / `envio_conteos`. Profit lo procesa y cierra el inventario. | `cerrar_inventario` |
 
 Todo lo demás es **sin WiFi**, en la base del teléfono:
 
@@ -82,8 +84,23 @@ se cambia la App: se agrega un renglón en `SIGUEC_PURACERAMICA.dbo.parametros`:
 contados quedan en cero al cerrarlo) y `procesado` (0 iniciado, 1 cerrado). Todo su SQL
 está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 
-**PENDIENTE: la tabla de renglones de la toma física** (dónde va lo contado por
-artículo). Mientras tanto "Enviar a Profit" avisa que falta configurarla.
+**Resultado de inventario** (lo que graba "Enviar a Profit"):
+
+| Campo | Valor |
+|---|---|
+| `saResInventario.num_resinv` | `APP` + número del envío (`APP0000012`): no choca con el correlativo de Profit (prefijo en `profit.prefijo_resultado`) |
+| `des_resinv` | `App <usuario> <teléfono>` |
+| `fecha`, `fe_us_in`, `fe_us_mo` | Hora del servidor |
+| `co_invfisico`, `co_alma` | Los del inventario abierto (si el inventario no tiene almacén, no se puede enviar) |
+| `co_mone`, `tasa` | Parámetro `profit.co_mone` (si no está, la del último resultado grabado en Profit) y `profit.tasa` (1) |
+| `co_us_in/mo`, `co_sucu_in/mo` | Usuario y sucursal del **registro del inventario** en `saInventarioFisico` |
+| `saResInventarioReng.reng_num` | 1, 2, 3... (un renglón por artículo) |
+| `co_uni` | Unidad principal del artículo en `saArtUnidad` |
+| `total_art` | Stock contado (suma de los conteos del teléfono) |
+| `total_art_teo` | Existencia actual en el almacén (`saStockAlmacen`, tipo `ACT`; 0 si no se puede leer) |
+| `sco_uni`, `stotal_art_teo`, `stotal_art`, `cost_unit` | NULL / 0 / 0 / 0 |
+
+Cada teléfono que envía crea **su propio resultado** del mismo inventario.
 
 ## Instalación
 
@@ -110,7 +127,7 @@ android/
   app/                  MainActivity (navegación) y SiguecApp
   core/red/             Conexión DIRECTA (JDBC jTDS, Kotlin puro): BaseDatos, ConfigConexion,
                         Seguridad (PBKDF2), RepositorioAcceso, RepositorioAdmin, Sincronizacion
-                        (saArticulo), RepositorioInventarioProfit, TomaFisica (PENDIENTE), Logica
+                        (saArticulo), RepositorioInventarioProfit, TomaFisica (saInventarioFisico y saResInventario), Logica
   core/local/           Base del teléfono (SQLite): ArticulosLocales, InventariosLocales
   core/sesion/          Configuración, sesión, usuarios recordados (entrar sin WiFi)
   core/ui/              Tema, barra, estados y escáner (Google Code Scanner)
@@ -123,6 +140,6 @@ android/
 ```
 
 ## Pruebas
-`cd android && gradlew :core:red:test`: 16 pruebas (conexión, nombres de Profit,
+`cd android && gradlew :core:red:test`: 17 pruebas (conexión, nombres de Profit,
 sincronización, totales del envío, claves compatibles con AppSighecMovil y el ADMIN
 del script SQL). Las pantallas y la base del teléfono se compilan en Android Studio.

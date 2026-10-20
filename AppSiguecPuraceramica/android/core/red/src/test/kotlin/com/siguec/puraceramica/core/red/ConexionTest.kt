@@ -84,6 +84,16 @@ class ConexionTest {
     }
 
     @Test
+    fun numeroDelResultadoDeInventario() {
+        // saResInventario.num_resinv es char(20)
+        assertEquals("APP0000012", TomaFisica2K12.numeroResultado("APP", 12))
+        assertTrue(TomaFisica2K12.numeroResultado("ABCDEFGHIJ", Int.MAX_VALUE).length <= 20)
+        assertNotNull(ConfigProfit(prefijoResultado = "AP P").validar())
+        assertNotNull(ConfigProfit(tasa = "0").validar())
+        assertNull(ConfigProfit.desdeParametros(mapOf("profit.co_mone" to "BS")).validar())
+    }
+
+    @Test
     fun totalesDelEnvio() {
         val ahora = LocalDateTime.of(2026, 10, 19, 9, 0)
         val renglones = listOf(

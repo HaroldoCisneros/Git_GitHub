@@ -27,17 +27,32 @@ data class ConfigProfit(
     // Tabla aparte de códigos de barra ("" = no hay)
     val tablaCodigosBarra: String = "",
     val colCodigoBarra: String = "cod_barra",
-    val colCodigoBarraArticulo: String = "co_art"
+    val colCodigoBarraArticulo: String = "co_art",
+    // Resultado de inventario (saResInventario): el número se arma con este prefijo + el
+    // número del envío (APP0000012), para no chocar con el correlativo propio de Profit
+    val prefijoResultado: String = "APP",
+    // Moneda y tasa del resultado ("" = la del último saResInventario grabado en Profit)
+    val coMone: String = "",
+    val tasa: String = "1",
+    // Existencia teórica de cada renglón (saResInventarioReng.total_art_teo)
+    val tablaStock: String = "saStockAlmacen",
+    val colStockTipo: String = "tipo",          // "" = la tabla no tiene tipo
+    val tipoStockActual: String = "ACT",
+    val colStockCantidad: String = "stock"
 ) {
     /** null = todo bien; si no, el nombre que no es válido. */
     fun validar(): String? =
         (listOf(tablaArticulos, colCodigo, colDescripcion, colAnulado, colTipo, tablaCodigosBarra, colCodigoBarra,
-            colCodigoBarraArticulo) + columnasCodigo)
+            colCodigoBarraArticulo, tablaStock, colStockTipo, colStockCantidad) + columnasCodigo)
             .filter { it.isNotEmpty() }
             .firstOrNull { !PATRON.matches(it) }
             ?.let { "Nombre no válido de tabla o columna de Profit: '$it'" }
             // Los tipos van como texto dentro del SQL: solo una letra
             ?: tiposExcluidos.firstOrNull { !Regex("^[A-Z]$").matches(it) }?.let { "Tipo de artículo no válido: '$it'" }
+            ?: prefijoResultado.takeUnless { Regex("^[A-Za-z0-9]{0,10}$").matches(it) }
+                ?.let { "Prefijo del resultado no válido: '$it' (solo letras y números, máximo 10)" }
+            ?: tasa.takeUnless { (it.toBigDecimalOrNull()?.signum() ?: 0) > 0 }?.let { "La tasa debe ser mayor que 0: '$it'" }
+            ?: tipoStockActual.takeUnless { Regex("^[A-Za-z0-9]{0,6}$").matches(it) }?.let { "Tipo de stock no válido: '$it'" }
 
     companion object {
         private val PATRON = Regex("^[A-Za-z_][A-Za-z0-9_]{0,127}$")
@@ -61,7 +76,14 @@ data class ConfigProfit(
                     .split(",").map { it.trim() }.filter { it.isNotEmpty() },
                 tablaCodigosBarra = v("tabla_codigos_barra", d.tablaCodigosBarra),
                 colCodigoBarra = v("col_codigo_barra", d.colCodigoBarra),
-                colCodigoBarraArticulo = v("col_codigo_barra_articulo", d.colCodigoBarraArticulo)
+                colCodigoBarraArticulo = v("col_codigo_barra_articulo", d.colCodigoBarraArticulo),
+                prefijoResultado = v("prefijo_resultado", d.prefijoResultado),
+                coMone = v("co_mone", d.coMone),
+                tasa = v("tasa", d.tasa),
+                tablaStock = v("tabla_stock", d.tablaStock),
+                colStockTipo = v("col_stock_tipo", d.colStockTipo),
+                tipoStockActual = v("tipo_stock_actual", d.tipoStockActual),
+                colStockCantidad = v("col_stock_cantidad", d.colStockCantidad)
             )
         }
     }

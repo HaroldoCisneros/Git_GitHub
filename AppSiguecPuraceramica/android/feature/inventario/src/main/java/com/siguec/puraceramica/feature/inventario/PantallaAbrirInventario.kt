@@ -164,6 +164,7 @@ private fun DatosInventario(
                 Dato("Almacén", Inventario.almacen(t.coAlma, t.desAlma))
                 Dato("Inicio en Profit", t.fecha?.let(Formato::fecha) ?: "—")
                 Dato("No contados", if (t.artCero) "Quedan en CERO al cerrarlo en Profit" else "Conservan su existencia")
+                Dato("Registrado en Profit por", "Usuario ${t.coUsProfit.ifBlank { "—" }} · Sucursal ${t.coSucuProfit.ifBlank { "—" }}")
             }
         }
         Text(

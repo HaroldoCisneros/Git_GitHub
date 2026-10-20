@@ -91,7 +91,11 @@ data class TomaProfitDto(
     val desAlma: String = "",
     val descripcion: String = "", // des_invfisico
     val fecha: String? = null,   // inicio ("2026-10-20 08:30")
-    val artCero: Boolean = false // Los artículos no contados quedan en cero al cerrarlo en Profit
+    val artCero: Boolean = false, // Los artículos no contados quedan en cero al cerrarlo en Profit
+    // Usuario y sucursal de Profit del REGISTRO del inventario (saInventarioFisico.co_us_in /
+    // co_sucu_in): con ellos se graba el resultado en saResInventario al enviar
+    val coUsProfit: String = "",
+    val coSucuProfit: String = ""
 )
 
 /** Lo que devuelve "Abrir": quién y cuándo (hora del servidor). */
@@ -106,6 +110,8 @@ data class InventarioDto(
     val descripcion: String = "",
     val fecha: String? = null,   // Inicio en Profit
     val artCero: Boolean = false,
+    val coUsProfit: String = "",   // saInventarioFisico.co_us_in (se usa al enviar)
+    val coSucuProfit: String = "", // saInventarioFisico.co_sucu_in (se usa al enviar)
     val abiertoPor: String = "", // Usuario que lo abrió en la App
     val fechaApertura: String? = null,
     val abierto: Boolean = true, // false = ya se envió a Profit (no se puede contar)
@@ -136,8 +142,8 @@ data class RenglonEnvio(
     val fecha: LocalDateTime
 )
 
-/** Lo que se envió a Profit. */
-data class ResultadoEnvio(val envioId: Int, val articulos: Int, val conteos: Int)
+/** Lo que se envió a Profit. @property numResinv número del resultado en saResInventario */
+data class ResultadoEnvio(val envioId: Int, val articulos: Int, val conteos: Int, val numResinv: String = "")
 
 // ---------------------------- Administración ----------------------------
 

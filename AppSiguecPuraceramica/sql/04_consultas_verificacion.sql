@@ -6,7 +6,7 @@
    Solo leen: se pueden ejecutar sin riesgo.
    ===================================================================== */
 
-USE PURACERAMICA;   -- Cambie por la base de la empresa
+USE SAPURA_A;   -- Cambie por la base de la empresa
 GO
 
 -- 1. ¿Existen las tablas?

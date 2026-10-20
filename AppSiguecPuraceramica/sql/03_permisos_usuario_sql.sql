@@ -6,9 +6,10 @@
 
      Paso 1. Login y lectura/escritura en la base propia SIGUEC_PURACERAMICA.
      Paso 2. En la empresa de Profit 2K12:
-             - SOLO LECTURA de artículos (sincronizar).
-             - Lectura de las tomas físicas abiertas y escritura de lo contado
-               (las tablas de toma física se completan cuando se confirmen).
+             - SOLO LECTURA de artículos, almacenes, unidades, stock e
+               inventarios físicos.
+             - INSERT en saResInventario y saResInventarioReng (el resultado
+               de lo contado). La App NUNCA modifica ni borra datos de Profit.
 
    Recomendado: que el puerto 1433 solo se pueda alcanzar desde la red WiFi
    de la empresa (firewall de Windows), nunca desde internet.
@@ -29,8 +30,8 @@ EXEC sp_addrolemember 'db_datareader', 'siguec_puraceramica';
 EXEC sp_addrolemember 'db_datawriter', 'siguec_puraceramica';
 GO
 
-/* ---------- Paso 2: EMPRESA de Profit 2K12 (repetir cambiando PURACERAMICA) ---------- */
-USE PURACERAMICA;
+/* ---------- Paso 2: EMPRESA de Profit 2K12 (repetir cambiando SAPURA_A) ---------- */
+USE SAPURA_A;
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'siguec_puraceramica')
     CREATE USER siguec_puraceramica FOR LOGIN siguec_puraceramica;
@@ -40,6 +41,9 @@ GRANT SELECT ON dbo.saArticulo TO siguec_puraceramica;   -- Sincronizar artícul
 
 GRANT SELECT ON dbo.saInventarioFisico TO siguec_puraceramica;  -- Inventarios sin procesar (abrir)
 GRANT SELECT ON dbo.saAlmacen          TO siguec_puraceramica;  -- Nombre del almacén
--- PENDIENTE (renglones de la toma física, para enviar lo contado):
--- GRANT SELECT, INSERT, UPDATE ON dbo.<renglones de la toma física> TO siguec_puraceramica;
+-- Enviar lo contado como resultado de inventario:
+GRANT SELECT          ON dbo.saArtUnidad          TO siguec_puraceramica;  -- Unidad de cada artículo
+GRANT SELECT          ON dbo.saStockAlmacen       TO siguec_puraceramica;  -- Existencia teórica
+GRANT SELECT, INSERT  ON dbo.saResInventario      TO siguec_puraceramica;  -- Encabezado del resultado
+GRANT INSERT          ON dbo.saResInventarioReng  TO siguec_puraceramica;  -- Renglones del resultado
 GO

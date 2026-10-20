@@ -34,9 +34,17 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
    Desde ahí se cuenta escaneando, asociado a ese inventario y su almacén. Si ya estaba
    abierto en ese teléfono, se sigue con el mismo. Implementado en `TomaFisica2K12`.
 
-## PENDIENTE
-- **Renglones de la toma física de Profit 2K12** (el usuario los va a pasar): implementar
-  `TomaFisica2K12.enviar()` en `android/core/red/.../TomaFisica.kt`. Definir cómo se
-  acumulan los envíos de varios teléfonos en el mismo inventario. Actualizar GRANT en sql/03.
+10. **Enviar** = resultado de inventario de Profit (`saResInventario` + `saResInventarioReng`),
+    con co_us_in / co_sucu_in del REGISTRO del inventario (pedido del usuario; se guardan al
+    abrir, en el teléfono y en aperturas). num_resinv = 'APP' + id del envío. Cada teléfono
+    = un resultado. co_uni = unidad principal de saArtUnidad; total_art_teo de saStockAlmacen.
+
+## POR CONFIRMAR con la base real
+- Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
+  enviar desde un solo teléfono o juntar en un resultado).
+- `saArtUnidad`: columna que marca la unidad principal (se usa uni_principal o equivalencia = 1
+  si existen). `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
+- Moneda del resultado (`profit.co_mone`) y si `cost_unit` debe llevar el costo (hoy 0).
+- Si se prefiere el correlativo de Profit para num_resinv en vez de 'APP' + número.
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
-  :core:red sí se compiló y probó: 16 pruebas OK).
+  :core:red sí se compiló y probó: 17 pruebas OK).

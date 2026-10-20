@@ -91,7 +91,9 @@ GO
 
 /* ---------- parametros ----------
    Solo si en su Profit 2K12 algún nombre es distinto al de fábrica.
-   Ejemplo:  INSERT INTO dbo.parametros VALUES ('profit.columnas_codigo', 'modelo,ref,cod_barra');
+   Ejemplos:
+     INSERT INTO dbo.parametros VALUES ('profit.co_mone', 'BS');            -- Moneda del resultado
+     INSERT INTO dbo.parametros VALUES ('profit.prefijo_resultado', 'APP'); -- num_resinv = APP0000012
    Claves válidas: ver android/core/red/.../ConfigProfit.kt                  */
 IF OBJECT_ID('dbo.parametros') IS NULL
 CREATE TABLE dbo.parametros (
@@ -110,16 +112,24 @@ CREATE TABLE dbo.aperturas (
     co_invfisico   varchar(20)    NOT NULL,                  -- saInventarioFisico.co_invfisico
     co_alma        varchar(6)     NULL,                      -- Almacén del inventario
     des_invfisico  varchar(60)    NULL,
+    co_us_in       varchar(6)     NULL,                      -- Usuario de Profit del registro del inventario
+    co_sucu_in     varchar(6)     NULL,                      -- Sucursal de Profit del registro del inventario
     usuario        varchar(30)    NOT NULL,                  -- Quién lo abrió
     dispositivo    varchar(100)   NULL,
     fecha          datetime       NOT NULL CONSTRAINT df_aperturas_fecha DEFAULT GETDATE()
 );
 GO
+-- Si la tabla ya existía (versión anterior del script)
+IF COL_LENGTH('dbo.aperturas', 'co_us_in') IS NULL
+    ALTER TABLE dbo.aperturas ADD co_us_in varchar(6) NULL, co_sucu_in varchar(6) NULL;
+GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_aperturas_inventario')
     CREATE INDEX ix_aperturas_inventario ON dbo.aperturas (co_empresa, co_invfisico);
 GO
 
-/* ---------- envios (auditoría de lo enviado a la toma física de Profit) ---------- */
+/* ---------- envios (auditoría de lo enviado a Profit) ----------
+   Cada envío de un teléfono crea en Profit UN resultado de inventario
+   (saResInventario + saResInventarioReng) con num_resinv = 'APP' + id del envío. */
 IF OBJECT_ID('dbo.envios') IS NULL
 CREATE TABLE dbo.envios (
     id            int IDENTITY(1,1) NOT NULL CONSTRAINT pk_envios PRIMARY KEY,
@@ -133,8 +143,12 @@ CREATE TABLE dbo.envios (
     fecha         datetime       NOT NULL CONSTRAINT df_envios_fecha DEFAULT GETDATE(),
     articulos     int            NOT NULL,                   -- Artículos distintos enviados
     conteos       int            NOT NULL,                   -- Conteos individuales enviados
+    num_resinv    varchar(20)    NULL,                       -- Resultado creado en Profit (saResInventario)
     CONSTRAINT uq_envios_clave UNIQUE (clave_envio)
 );
+GO
+IF COL_LENGTH('dbo.envios', 'num_resinv') IS NULL
+    ALTER TABLE dbo.envios ADD num_resinv varchar(20) NULL;
 GO
 IF OBJECT_ID('dbo.envio_conteos') IS NULL
 CREATE TABLE dbo.envio_conteos (

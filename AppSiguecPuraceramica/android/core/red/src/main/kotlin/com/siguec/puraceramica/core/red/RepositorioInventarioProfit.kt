@@ -8,7 +8,9 @@ import java.math.BigDecimal
  * Las operaciones del inventario que necesitan WiFi:
  *   traerAbiertas()  Los inventarios físicos sin procesar en Profit (saInventarioFisico).  [contar_inventario]
  *   abrir()          Abre uno en el teléfono: guarda quién y cuándo (tabla aperturas).     [contar_inventario]
- *   enviar()         Lo contado en el teléfono -> toma física de Profit.                   [cerrar_inventario]
+ *   enviar()         Lo contado en el teléfono -> resultado de inventario de Profit         [cerrar_inventario]
+ *                    (saResInventario + saResInventarioReng), con el usuario y la sucursal
+ *                    del registro del inventario.
  *
  * El envío va en UNA transacción: auditoría en SIGUEC_PURACERAMICA (envios y
  * envio_conteos) + toma física de Profit. Si algo falla no queda nada a medias.
@@ -41,9 +43,10 @@ class RepositorioInventarioProfit(
             }
             val fila = cx.consultarUno(
                 """SET NOCOUNT ON; INSERT INTO ${bd.baseApp}.dbo.aperturas (co_empresa, co_invfisico, co_alma, des_invfisico,
-                   usuario, dispositivo, fecha) VALUES (?, ?, ?, ?, ?, ?, GETDATE());
+                   co_us_in, co_sucu_in, usuario, dispositivo, fecha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE());
                    SELECT CONVERT(varchar(19), GETDATE(), 120) AS fecha""",
-                coEmpresa, toma.numero, toma.coAlma.ifEmpty { null }, toma.descripcion.take(60), usuario.usuario,
+                coEmpresa, toma.numero, toma.coAlma.ifEmpty { null }, toma.descripcion.take(60),
+                toma.coUsProfit.ifEmpty { null }, toma.coSucuProfit.ifEmpty { null }, usuario.usuario,
                 acceso.dispositivo.take(100)
             )
             acceso.anotarDesde(cx, Acciones.ABRIR_INVENTARIO, usuario, coEmpresa,
@@ -52,7 +55,8 @@ class RepositorioInventarioProfit(
         }
 
     /**
-     * Envía lo contado a la toma física de Profit.
+     * Envía lo contado a Profit como un RESULTADO DE INVENTARIO del inventario físico.
+     * Cada envío (cada teléfono) es un resultado aparte: num_resinv = prefijo + número del envío.
      * @param renglones los conteos individuales del teléfono (se suman por artículo para Profit)
      */
     suspend fun enviar(
@@ -66,14 +70,15 @@ class RepositorioInventarioProfit(
             "Su ambiente no permite cerrar (enviar) el inventario.")
         val app = bd.baseApp
         // ¿Ya llegó este mismo envío antes? Se devuelve lo que se grabó, sin repetir.
-        cx.consultarUno("SELECT id, articulos, conteos FROM $app.dbo.envios WHERE clave_envio = ?", claveEnvio)?.let {
-            return@usar ResultadoEnvio(it.entero("id"), it.entero("articulos"), it.entero("conteos"))
+        cx.consultarUno("SELECT id, articulos, conteos, num_resinv FROM $app.dbo.envios WHERE clave_envio = ?", claveEnvio)?.let {
+            return@usar ResultadoEnvio(it.entero("id"), it.entero("articulos"), it.entero("conteos"), it.texto("num_resinv"))
         }
         if (renglones.isEmpty()) throw ErrorApp("No hay nada contado para enviar.")
         if (!tomaFisica.estaAbierta(cx, toma.numero)) {
             throw ErrorApp("El inventario ${toma.numero} ya fue procesado (cerrado) en Profit.", TipoError.CONFLICTO)
         }
         val totales = totalesPorArticulo(renglones)
+        val cfg = acceso.configProfit(cx)
 
         // 1. Auditoría en la base de la App (quién contó qué)
         val envioId = cx.consultarUno(
@@ -87,11 +92,22 @@ class RepositorioInventarioProfit(
                 "VALUES (?, ?, ?, ?, ?, ?)",
             renglones.map { listOf(envioId, it.coArt, it.codigoLeido, it.cantidad, it.usuario, it.fecha) }
         )
-        // 2. Toma física de Profit (Profit se encarga de cerrarla)
-        tomaFisica.enviar(cx, toma.numero, totales, usuario.usuarioProfit.ifEmpty { usuario.usuario })
+        val numResinv = TomaFisica2K12.numeroResultado(cfg.prefijoResultado, envioId)
+        cx.ejecutar("UPDATE $app.dbo.envios SET num_resinv = ? WHERE id = ?", numResinv, envioId)
+
+        // 2. Resultado de inventario en Profit (Profit se encarga de procesarlo y cerrar el inventario)
+        tomaFisica.enviar(cx, cfg, EnvioProfit(
+            numero = toma.numero,
+            coAlma = toma.coAlma,
+            numResinv = numResinv,
+            descripcion = "App ${usuario.usuario} ${acceso.dispositivo}",
+            coUsuario = toma.coUsProfit,
+            coSucursal = toma.coSucuProfit,
+            totales = totales
+        ))
         acceso.anotarDesde(cx, Acciones.ENVIAR_TOMA, usuario, coEmpresa,
-            "Inventario ${toma.numero}, almacén ${toma.coAlma}: ${totales.size} artículos, ${renglones.size} conteos")
-        ResultadoEnvio(envioId, totales.size, renglones.size)
+            "Inventario ${toma.numero}, resultado $numResinv: ${totales.size} artículos, ${renglones.size} conteos")
+        ResultadoEnvio(envioId, totales.size, renglones.size, numResinv)
     }
 
     companion object {

@@ -38,6 +38,7 @@ internal class BaseLocal(contexto: Context) :
             co_alma TEXT NOT NULL, des_alma TEXT NOT NULL, descripcion TEXT NOT NULL, fecha TEXT,
             art_cero INTEGER NOT NULL DEFAULT 0,    -- Profit pone en 0 los no contados
             abierto_por TEXT, fecha_apertura TEXT,  -- Quién lo abrió en la App y cuándo
+            co_us_profit TEXT, co_sucu_profit TEXT, -- Usuario y sucursal del registro en Profit (para enviar)
             abierto INTEGER NOT NULL DEFAULT 1, enviado_por TEXT, fecha_envio TEXT,
             clave_envio TEXT,                       -- Se genera al primer intento de envío (no duplica)
             UNIQUE (co_empresa, numero))""")
@@ -54,10 +55,15 @@ internal class BaseLocal(contexto: Context) :
             db.execSQL("ALTER TABLE inventarios ADD COLUMN abierto_por TEXT")
             db.execSQL("ALTER TABLE inventarios ADD COLUMN fecha_apertura TEXT")
         }
+        // Versión 3: usuario y sucursal de Profit del registro del inventario
+        if (anterior < 3) {
+            db.execSQL("ALTER TABLE inventarios ADD COLUMN co_us_profit TEXT")
+            db.execSQL("ALTER TABLE inventarios ADD COLUMN co_sucu_profit TEXT")
+        }
     }
 
     companion object {
         const val NOMBRE = "siguec_local.db"
-        const val VERSION = 2
+        const val VERSION = 3
     }
 }

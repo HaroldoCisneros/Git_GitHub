@@ -38,14 +38,15 @@ class InventariosLocales internal constructor(private val base: BaseLocal) {
     private val columnas = """i.id, i.numero, i.co_alma, i.des_alma, i.descripcion, i.fecha, i.abierto, i.enviado_por,
         i.fecha_envio, (SELECT COUNT(DISTINCT co_art) FROM conteos c WHERE c.inventario_id = i.id) AS articulos,
         (SELECT COUNT(*) FROM conteos c WHERE c.inventario_id = i.id) AS conteos,
-        i.art_cero, i.abierto_por, i.fecha_apertura"""
+        i.art_cero, i.abierto_por, i.fecha_apertura, i.co_us_profit, i.co_sucu_profit"""
 
     private fun inventario(c: Cursor) = InventarioDto(
         id = c.getInt(0), numero = c.getString(1), coAlma = c.getString(2), desAlma = c.getString(3),
         descripcion = c.getString(4), fecha = c.getString(5), abierto = c.getInt(6) == 1,
         enviadoPor = c.getString(7).orEmpty(), fechaEnvio = c.getString(8),
         articulosContados = c.getInt(9), conteos = c.getInt(10),
-        artCero = c.getInt(11) == 1, abiertoPor = c.getString(12).orEmpty(), fechaApertura = c.getString(13)
+        artCero = c.getInt(11) == 1, abiertoPor = c.getString(12).orEmpty(), fechaApertura = c.getString(13),
+        coUsProfit = c.getString(14).orEmpty(), coSucuProfit = c.getString(15).orEmpty()
     )
 
     /** Id del inventario en el teléfono (null = no se ha abierto aquí). */
@@ -72,6 +73,8 @@ class InventariosLocales internal constructor(private val base: BaseLocal) {
                 put("art_cero", if (toma.artCero) 1 else 0)
                 put("abierto_por", apertura.usuario)
                 put("fecha_apertura", apertura.fecha)
+                put("co_us_profit", toma.coUsProfit)
+                put("co_sucu_profit", toma.coSucuProfit)
             }, SQLiteDatabase.CONFLICT_IGNORE)
             db.rawQuery("SELECT $columnas FROM inventarios i WHERE i.co_empresa = ? AND i.numero = ?",
                 arrayOf(coEmpresa, toma.numero)).use { c -> c.moveToFirst(); inventario(c) }

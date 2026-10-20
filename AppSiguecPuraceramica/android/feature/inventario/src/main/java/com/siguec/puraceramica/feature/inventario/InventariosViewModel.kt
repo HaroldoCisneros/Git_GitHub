@@ -67,8 +67,9 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
                     local.marcarEnviado(inventario.id, usuario.usuario)
                     if (gestor.ultimoInventario() == inventario.id) gestor.recordarInventario(null)
                     _estado.update {
-                        it.copy(trabajando = false, aviso = "Inventario ${inventario.numero} enviado a Profit: " +
-                            "${r.valor.articulos} artículos, ${r.valor.conteos} conteos. Ciérrela en Profit.")
+                        it.copy(trabajando = false, aviso = "Inventario ${inventario.numero} enviado a Profit " +
+                            "(resultado ${r.valor.numResinv}): ${r.valor.articulos} artículos, ${r.valor.conteos} conteos. " +
+                            "Procéselo en Profit.")
                     }
                     cargar()
                 }
