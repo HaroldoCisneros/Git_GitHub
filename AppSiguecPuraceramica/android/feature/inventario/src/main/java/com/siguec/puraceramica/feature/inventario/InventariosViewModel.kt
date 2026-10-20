@@ -72,6 +72,8 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
                             "Procéselo en Profit.")
                     }
                     cargar()
+                    // Ya hay conexión: se aprovecha para traer los permisos actuales del usuario
+                    gestor.actualizarSesion()
                 }
                 is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
             }

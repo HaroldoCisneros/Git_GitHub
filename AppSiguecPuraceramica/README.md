@@ -25,12 +25,16 @@ intermedio) y **solo** para:
 
 | Momento | Qué hace | Permiso |
 |---|---|---|
-| **Entrar** | Verifica usuario y clave en `SIGUEC_PURACERAMICA` (misma lógica de AppSighecMovil: PBKDF2, 5 claves erradas = 15 min bloqueado). **Sin WiFi** entra con la clave de la última vez que ese usuario entró con WiFi en ese teléfono. | — |
+| **Entrar (solo la 1.ª vez de cada usuario en el teléfono)** | Verifica usuario y clave en `SIGUEC_PURACERAMICA` (misma lógica de AppSighecMovil: PBKDF2, 5 claves erradas = 15 min bloqueado) y guarda en el teléfono el **hash** de la clave y sus permisos. **Desde la segunda vez se entra SIN conectarse** (con la clave o la huella, contra lo guardado; 5 claves erradas = 15 min bloqueado en el teléfono). | — |
 | **Sincronizar artículos** | Baja `saArticulo` (código, descripción, anulado, modelo, ref; sin los servicios `tipo = 'S'`) al teléfono, con los códigos para escanear. | `sincronizar_articulos` |
 | **Abrir inventario** | Consulta en Profit los inventarios físicos creados y sin procesar (`saInventarioFisico.procesado = 0`, con el nombre del almacén de `saAlmacen`). Se elige uno, se ven sus datos y se toca **Abrir**: queda en el teléfono con el **usuario y la hora** (también en `SIGUEC_PURACERAMICA.dbo.aperturas` y la bitácora). | `contar_inventario` |
 | **Enviar (cerrar)** | Graba lo contado como **resultado de inventario** en Profit: `saResInventario` (encabezado) + `saResInventarioReng` (un renglón por artículo con la suma de los conteos), con el **usuario y la sucursal del registro del inventario** (`saInventarioFisico.co_us_in` / `co_sucu_in`, guardados al abrirlo). Queda auditoría en `envios` / `envio_conteos`. Profit lo procesa y cierra el inventario. | `cerrar_inventario` |
 
-Todo lo demás es **sin WiFi**, en la base del teléfono:
+Todo lo demás es **sin WiFi**, en la base del teléfono (la App no se conecta al abrirla ni al
+entrar). Cuando se conecta para sincronizar, abrir o enviar, aprovecha para traer los permisos
+y la clave actuales del usuario (cambios del administrador); si se desactivó al usuario, se
+cierra su sesión. Si el administrador le cambió la clave, la clave nueva vale en el teléfono la
+primera vez que se escribe con WiFi.
 
 - **Artículos**: consulta de código, descripción y stock contado (si ya se contó en la toma elegida).
 - **Contar**: se elige el inventario abierto (asociado a su almacén) y se **escanea** el código de barras; muestra el
@@ -154,7 +158,7 @@ android/
                         Seguridad (PBKDF2), RepositorioAcceso, RepositorioAdmin, Sincronizacion
                         (saArticulo), RepositorioInventarioProfit, TomaFisica (saInventarioFisico y saResInventario), Logica
   core/local/           Base del teléfono (SQLite): ArticulosLocales, InventariosLocales
-  core/sesion/          Configuración, sesión, usuarios recordados (entrar sin WiFi)
+  core/sesion/          Configuración, sesión, usuarios recordados (entrar sin conexión) y huellas
   core/ui/              Tema (rojos del logo), logos de Puracerámica (res/drawable-nodpi),
                         barra, estados y escáner (Google Code Scanner)
   feature/login         Entrada, Configuración de la conexión, elegir empresa

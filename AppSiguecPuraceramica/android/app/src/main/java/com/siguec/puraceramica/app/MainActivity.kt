@@ -138,7 +138,6 @@ private fun Navegacion(gestor: GestorSesion, alSalir: () -> Unit) {
                 nombreUsuario = s.usuario.nombre,
                 nombreEmpresa = a.nombre,
                 variasEmpresas = s.ambientes.size > 1,
-                sinConexion = s.sinConexion,
                 puedeContar = p.contarInventario,
                 puedeConsultar = p.consultarArticulos || p.sincronizarArticulos,
                 puedeInventarios = p.contarInventario || p.cerrarInventario,

@@ -91,8 +91,15 @@ servidor, el usuario de SQL, la **base de la App**, la **base de datos de Profit
 cierra la sesión: al entrar se trabaja con la empresa nueva y hay que sincronizar sus
 artículos. A los usuarios que no son administradores el administrador les da la empresa
 nueva en Usuarios y permisos.
-Sin WiFi (o si la conexión es justo lo que hay que corregir) se autoriza con la clave
-guardada de un usuario que ya entró antes en ese teléfono.
+La autorización no se conecta si el usuario ya entró antes en ese teléfono (se revisa con lo
+guardado); solo va al servidor si el teléfono no lo conoce o si el permiso se lo dieron después.
+
+### Cuándo se conecta la App
+
+**Solo** en: la primera entrada de cada usuario en el teléfono, **Sincronizar artículos**,
+**Abrir inventario**, **Enviar a Profit**, Usuarios y permisos (administrador) y Configuración
+(Probar / Guardar / Buscar monedas). Entrar (desde la segunda vez), consultar artículos y
+**contar** son **sin conexión**.
 
 ## Paso 5. Uso en una toma de inventario
 

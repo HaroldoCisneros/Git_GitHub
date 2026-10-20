@@ -139,6 +139,8 @@ class ArticulosViewModel(
                                 "${Formato.cantidad(s?.codigos?.toDouble())} códigos para escanear")
                     }
                     buscar()
+                    // Ya hay conexión: se aprovecha para traer los permisos actuales del usuario
+                    gestor.actualizarSesion()
                 }
                 is Resultado.Error -> _estado.update { it.copy(sincronizando = false, aviso = r.mensaje) }
             }

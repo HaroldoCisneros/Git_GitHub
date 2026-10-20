@@ -47,14 +47,12 @@ data class UsuarioDto(
 }
 
 /**
- * La sesión en el teléfono.
- * @property sinConexion true = entró sin WiFi (con la clave guardada de la última vez)
+ * La sesión en el teléfono (la entrada es sin conexión: con lo guardado en el teléfono).
  */
 @Serializable
 data class SesionDto(
     val usuario: UsuarioDto,
-    val ambientes: List<AmbienteDto> = emptyList(),
-    val sinConexion: Boolean = false
+    val ambientes: List<AmbienteDto> = emptyList()
 )
 
 // ---------------------------- Artículos ----------------------------

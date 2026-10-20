@@ -31,8 +31,8 @@ import kotlinx.coroutines.withContext
  * Dueño ÚNICO de la sesión en el teléfono. Lo crea :app una sola vez (SiguecApp).
  *
  *  - conexion / guardarConexion() / probarConexion()   Pantalla Configuración.
- *  - entrar()        Con WiFi: contra el SQL Server. Sin WiFi: con la clave guardada de la
- *                    última vez que ese usuario entró CON WiFi en este teléfono.
+ *  - entrar()        SIN conectarse: con la clave guardada en el teléfono. Solo la primera
+ *                    vez de cada usuario en el teléfono va al SQL Server (WiFi una vez).
  *  - restaurar()     Al abrir la App: si quedó una sesión abierta, entra solo.
  *  - elegirEmpresa() La empresa de Profit con la que se trabaja.
  *  - local           La base del teléfono (artículos, inventarios y conteos): sin WiFi.
@@ -40,6 +40,11 @@ import kotlinx.coroutines.withContext
  *  - salir()         Cierra la sesión en el teléfono.
  */
 class GestorSesion(contexto: Context) {
+
+    private companion object {
+        const val INTENTOS_LOCALES = 5        // Claves erradas en el teléfono antes de bloquear
+        const val MINUTOS_BLOQUEO_LOCAL = 15
+    }
 
     private val almacen = AlmacenSesion(contexto.applicationContext)
 
@@ -89,25 +94,32 @@ class GestorSesion(contexto: Context) {
     /**
      * Antes de abrir Configuración (cuando ya está configurada): usuario y clave (o huella) de
      * alguien con permiso "Puede cambiar la Configuración" o administrador.
-     * Se revisa en el servidor; si no responde (sin WiFi o la conexión es justo lo que hay que
-     * corregir), con la clave guardada de un usuario que ya entró antes en este teléfono.
+     * SIN conectarse si ese usuario ya entró antes en este teléfono (clave guardada). Solo va al
+     * servidor si el teléfono no lo conoce, o si aquí no tiene el permiso (por si se lo dieron).
      */
     suspend fun autorizarConfiguracion(usuario: String, clave: String): Resultado<UsuarioDto> {
         val codigo = usuario.trim().uppercase()
         if (codigo.isEmpty() || clave.isEmpty()) return Resultado.Error("Escriba el usuario y la clave.", TipoError.VALIDACION)
+        val recordado = almacen.recordado(codigo)
+        val local = recordado != null && claveLocalCorrecta(codigo, clave, recordado)
+        if (local && recordado!!.sesion.usuario.autorizaConfiguracion) return Resultado.Exito(recordado.sesion.usuario)
+        if (recordado != null && !local && almacen.bloqueoLocal(codigo) > System.currentTimeMillis()) {
+            return Resultado.Error(mensajeBloqueo(codigo), TipoError.CLAVE)
+        }
         val u = when (val r = acceso().entrar(codigo, clave)) {
             is Resultado.Exito -> {
                 almacen.recordar(codigo, UsuarioRecordado(r.valor.claveHash, r.valor.sesion))
                 r.valor.sesion.usuario
             }
-            is Resultado.Error -> when (r.tipo) {
-                TipoError.SIN_CONEXION, TipoError.CONEXION, TipoError.SERVIDOR -> {
-                    val recordado = almacen.recordado(codigo) ?: return Resultado.Error(
-                        "${r.mensaje}\nSin conexión con el servidor solo se puede autorizar un usuario que ya " +
-                            "entró antes en este teléfono.", r.tipo)
-                    val coincide = withContext(Dispatchers.Default) { Seguridad.claveCoincide(clave, recordado.claveHash) }
-                    if (!coincide) return Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
-                    recordado.sesion.usuario
+            is Resultado.Error -> when {
+                // Sin servidor: vale lo del teléfono
+                local && r.tipo in listOf(TipoError.SIN_CONEXION, TipoError.CONEXION, TipoError.SERVIDOR) ->
+                    recordado!!.sesion.usuario
+                recordado == null && r.tipo == TipoError.SIN_CONEXION -> return Resultado.Error(
+                    "${r.mensaje}\n$codigo nunca ha entrado en este teléfono: la primera vez necesita el WiFi.", r.tipo)
+                !local && recordado != null && r.tipo in listOf(TipoError.SIN_CONEXION, TipoError.CONEXION) -> {
+                    registrarFalloLocal(codigo)
+                    return Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
                 }
                 else -> return r
             }
@@ -148,40 +160,91 @@ class GestorSesion(contexto: Context) {
     // ---------- Entrar y salir ----------
 
     /**
-     * Entra con usuario y clave. Primero intenta con el SQL Server; si no hay WiFi,
-     * usa la clave guardada de la última entrada con WiFi en este teléfono.
+     * Entra con usuario y clave SIN conectarse: el teléfono guarda el HASH de la clave (nunca la
+     * clave) y los permisos de cada usuario que ya entró aquí. Solo se va al servidor:
+     *  - la PRIMERA vez que ese usuario entra en este teléfono (necesita el WiFi una vez), o
+     *  - si la clave no coincide con la guardada (el administrador pudo cambiarla) y hay WiFi.
+     * Los permisos se refrescan solos cuando el teléfono se conecta para sincronizar, abrir o
+     * enviar (ver actualizarSesion). 5 claves erradas en el teléfono = 15 minutos bloqueado.
      */
     suspend fun entrar(usuario: String, clave: String): Resultado<SesionDto> {
         val codigo = usuario.trim().uppercase()
-        return when (val r = acceso().entrar(codigo, clave)) {
-            is Resultado.Exito -> {
-                // Se recuerda el HASH (no la clave) para poder entrar después sin WiFi
-                almacen.recordar(codigo, UsuarioRecordado(r.valor.claveHash, r.valor.sesion))
-                iniciar(r.valor.sesion)
-                Resultado.Exito(r.valor.sesion)
-            }
-            is Resultado.Error -> when (r.tipo) {
-                TipoError.SIN_CONEXION -> entrarSinConexion(codigo, clave, r.mensaje)
-                // Inactivo o sin empresas: ya no puede entrar tampoco sin WiFi
-                TipoError.CLAVE -> {
-                    if (r.mensaje.contains("inactivo") || r.mensaje.contains("ninguna empresa")) almacen.recordar(codigo, null)
-                    r
-                }
+        if (codigo.isEmpty() || clave.isEmpty()) return Resultado.Error("Escriba el usuario y la clave.", TipoError.VALIDACION)
+        val recordado = almacen.recordado(codigo)
+            ?: return when (val r = entrarEnServidor(codigo, clave)) {
+                // Primera vez en este teléfono
+                is Resultado.Error -> if (r.tipo != TipoError.SIN_CONEXION) r else Resultado.Error(
+                    "${r.mensaje}\nEs la primera vez que $codigo entra en este teléfono: necesita el WiFi de la " +
+                        "empresa UNA vez; después entra y cuenta sin conexión.", TipoError.SIN_CONEXION)
                 else -> r
             }
+        if (almacen.bloqueoLocal(codigo) > System.currentTimeMillis()) return Resultado.Error(mensajeBloqueo(codigo), TipoError.CLAVE)
+        if (claveLocalCorrecta(codigo, clave, recordado)) {
+            iniciar(recordado.sesion)
+            return Resultado.Exito(recordado.sesion)
+        }
+        // No coincide con la guardada: si hay WiFi se pregunta al servidor (quizá cambió la clave)
+        return when (val r = entrarEnServidor(codigo, clave)) {
+            is Resultado.Error -> if (r.tipo == TipoError.SIN_CONEXION || r.tipo == TipoError.CONEXION) {
+                registrarFalloLocal(codigo)
+                Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
+            } else r
+            else -> r
         }
     }
 
-    private suspend fun entrarSinConexion(codigo: String, clave: String, motivo: String): Resultado<SesionDto> {
-        val recordado = almacen.recordado(codigo)
-            ?: return Resultado.Error("$motivo\nSin WiFi solo pueden entrar los usuarios que ya entraron " +
-                "una vez con WiFi en este teléfono.", TipoError.SIN_CONEXION)
-        // PBKDF2 tarda ~1 s: fuera del hilo de la pantalla
+    /** Entrada contra el SQL Server; si entra, se recuerda el HASH para las próximas entradas sin conexión. */
+    private suspend fun entrarEnServidor(codigo: String, clave: String): Resultado<SesionDto> =
+        when (val r = acceso().entrar(codigo, clave)) {
+            is Resultado.Exito -> {
+                almacen.recordar(codigo, UsuarioRecordado(r.valor.claveHash, r.valor.sesion))
+                almacen.limpiarFallosLocales(codigo)
+                iniciar(r.valor.sesion)
+                Resultado.Exito(r.valor.sesion)
+            }
+            is Resultado.Error -> {
+                // Inactivo o sin empresas: ya no puede entrar tampoco sin conexión
+                if (r.tipo == TipoError.CLAVE && (r.mensaje.contains("inactivo") || r.mensaje.contains("ninguna empresa"))) {
+                    almacen.recordar(codigo, null)
+                }
+                r
+            }
+        }
+
+    /** Compara con el hash guardado (PBKDF2 tarda ~1 s: fuera del hilo de la pantalla). */
+    private suspend fun claveLocalCorrecta(codigo: String, clave: String, recordado: UsuarioRecordado): Boolean {
         val coincide = withContext(Dispatchers.Default) { Seguridad.claveCoincide(clave, recordado.claveHash) }
-        if (!coincide) return Resultado.Error("Usuario o clave incorrectos.", TipoError.CLAVE)
-        val sesion = recordado.sesion.copy(sinConexion = true)
-        iniciar(sesion)
-        return Resultado.Exito(sesion)
+        if (coincide) almacen.limpiarFallosLocales(codigo)
+        return coincide
+    }
+
+    private fun registrarFalloLocal(codigo: String) = almacen.sumarFalloLocal(codigo, INTENTOS_LOCALES, MINUTOS_BLOQUEO_LOCAL)
+
+    private fun mensajeBloqueo(codigo: String): String {
+        val hora = java.text.SimpleDateFormat("hh:mm a", java.util.Locale("es", "VE")).format(java.util.Date(almacen.bloqueoLocal(codigo)))
+        return "Usuario bloqueado en este teléfono por varias claves erradas. Intente después de las $hora."
+    }
+
+    /**
+     * Trae del servidor los permisos y la clave actuales del usuario que está usando la App.
+     * Lo llaman las pantallas DESPUÉS de una operación que ya se conectó (sincronizar, abrir,
+     * enviar): así los cambios del administrador llegan al teléfono sin conectarse al entrar.
+     * Si falla no pasa nada; si el usuario ya no existe o está inactivo, se cierra la sesión.
+     */
+    suspend fun actualizarSesion() {
+        val actual = _sesion.value ?: return
+        val r = acceso().sesionDe(actual.usuario.usuario) as? Resultado.Exito ?: return
+        val entrada = r.valor
+        if (entrada == null || entrada.sesion.ambientes.isEmpty()) {
+            almacen.recordar(actual.usuario.usuario, null)
+            salir()
+            return
+        }
+        almacen.recordar(actual.usuario.usuario, UsuarioRecordado(entrada.claveHash, entrada.sesion))
+        val empresa = _ambiente.value?.coEmpresa
+        iniciar(entrada.sesion)
+        // Sigue en la misma empresa si todavía la tiene
+        entrada.sesion.ambientes.firstOrNull { it.coEmpresa == empresa }?.let { _ambiente.value = it }
     }
 
     /** Al abrir la App: la sesión que quedó abierta (null = hay que entrar). */

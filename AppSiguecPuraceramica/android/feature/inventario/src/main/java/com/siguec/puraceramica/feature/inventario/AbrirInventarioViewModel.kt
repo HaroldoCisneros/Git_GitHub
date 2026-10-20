@@ -50,8 +50,10 @@ class AbrirInventarioViewModel(private val gestor: GestorSesion, private val coE
         viewModelScope.launch {
             val yaAbiertos = gestor.local.inventarios.lista(coEmpresa).map { it.numero }.toSet()
             when (val r = gestor.inventarioProfit().traerAbiertas(usuario, coEmpresa)) {
-                is Resultado.Exito -> _estado.update {
-                    it.copy(cargando = false, inventarios = r.valor, yaAbiertos = yaAbiertos)
+                is Resultado.Exito -> {
+                    _estado.update { it.copy(cargando = false, inventarios = r.valor, yaAbiertos = yaAbiertos) }
+                    // Ya hay conexión: se aprovecha para traer los permisos actuales del usuario
+                    gestor.actualizarSesion()
                 }
                 is Resultado.Error -> _estado.update { it.copy(cargando = false, mensajeError = r.mensaje) }
             }

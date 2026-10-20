@@ -165,6 +165,25 @@ class RepositorioAcceso(private val bd: BaseDatos, val dispositivo: String) {
     }
 
     /**
+     * Permisos y clave actuales de un usuario que ya entró (sin pedirle la clave): se usa
+     * cuando el teléfono ya está conectado por otra razón (sincronizar, abrir o enviar) para
+     * traer los cambios del administrador. null = ya no existe o está inactivo.
+     */
+    suspend fun sesionDe(usuario: String): Resultado<Entrada?> = bd.usar { cx ->
+        val f = cx.consultarUno(SQL_USUARIO, usuario.trim().uppercase())
+        if (f == null || !f.logico("activo")) {
+            null
+        } else {
+            val id = f.entero("id")
+            Entrada(
+                SesionDto(UsuarioDto(id, f.texto("usuario"), f.texto("nombre"), f.logico("es_administrador"),
+                    f.texto("usuario_profit"), f.logico("puede_configurar")), cx.consultar(SQL_AMBIENTES, id).map(::ambienteDesdeFila)),
+                f.texto("clave_hash")
+            )
+        }
+    }
+
+    /**
      * Antes de una operación con Profit (sincronizar, traer, enviar): el permiso se vuelve a
      * leer del servidor (si el administrador se lo quitó o lo desactivó, aplica de una vez).
      * Se usa DENTRO de la transacción de la operación.

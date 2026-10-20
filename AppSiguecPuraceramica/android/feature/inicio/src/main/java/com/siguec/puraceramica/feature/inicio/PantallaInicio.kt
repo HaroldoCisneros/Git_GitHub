@@ -55,7 +55,6 @@ import com.siguec.puraceramica.core.ui.componentes.LogoBarraPuraceramica
  * @param nombreUsuario nombre del usuario que entró
  * @param nombreEmpresa empresa elegida (se muestra en la barra)
  * @param variasEmpresas true = se muestra "Cambiar empresa"
- * @param sinConexion entró sin WiFi (se avisa: contar sí, sincronizar/traer/enviar no)
  * @param puedeContar permiso "contar inventario": opción "Contar"
  * @param puedeConsultar permiso "consultar artículos" o "sincronizar": opción "Artículos"
  * @param puedeInventarios permiso "contar" o "cerrar": opción "Inventarios" (traer de Profit / enviar)
@@ -67,7 +66,6 @@ fun PantallaInicio(
     nombreUsuario: String,
     nombreEmpresa: String,
     variasEmpresas: Boolean,
-    sinConexion: Boolean,
     puedeContar: Boolean,
     puedeConsultar: Boolean,
     puedeInventarios: Boolean,
@@ -112,11 +110,10 @@ fun PantallaInicio(
             LogoBarraPuraceramica(Modifier.fillMaxWidth())
             Text("Hola, $nombreUsuario", style = MaterialTheme.typography.headlineSmall)
             Text("Toma de inventario", style = MaterialTheme.typography.bodyLarge)
-            if (sinConexion) {
-                Text("Entró sin WiFi: puede contar. Para sincronizar, traer o enviar inventarios conéctese " +
-                    "al WiFi de la empresa.", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.tertiary)
-            }
+            // La App solo se conecta en las opciones marcadas "WiFi"; lo demás es sin conexión
+            Text("Se cuenta sin conexión. Solo necesita el WiFi de la empresa para sincronizar artículos, " +
+                "abrir un inventario y enviarlo a Profit.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             // ---------- Opción 1: Contar (lo más usado, va primero) ----------
             if (puedeContar) {

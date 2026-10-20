@@ -81,6 +81,30 @@ internal class AlmacenSesion(contexto: Context) {
         preferencias.edit { putString(RECORDADOS, json.encodeToString(serializadorRecordados, nuevos)) }
     }
 
+    // ---------- Claves erradas en el teléfono (la entrada es sin conexión) ----------
+
+    /** Hasta cuándo está bloqueado ese usuario en este teléfono (milisegundos; 0 = no). */
+    fun bloqueoLocal(usuario: String): Long = preferencias.getLong(BLOQUEO + usuario.uppercase(), 0L)
+
+    /** Una clave errada más; al llegar a [maximo], bloquea [minutos] minutos. */
+    fun sumarFalloLocal(usuario: String, maximo: Int, minutos: Int) {
+        val u = usuario.uppercase()
+        val fallos = preferencias.getInt(FALLOS + u, 0) + 1
+        preferencias.edit {
+            if (fallos >= maximo) {
+                putInt(FALLOS + u, 0)
+                putLong(BLOQUEO + u, System.currentTimeMillis() + minutos * 60_000L)
+            } else {
+                putInt(FALLOS + u, fallos)
+            }
+        }
+    }
+
+    fun limpiarFallosLocales(usuario: String) = preferencias.edit {
+        remove(FALLOS + usuario.uppercase())
+        remove(BLOQUEO + usuario.uppercase())
+    }
+
     // ---------- Huella (por usuario) ----------
 
     private val serializadorHuellas = MapSerializer(String.serializer(), HuellaGuardada.serializer())
@@ -119,6 +143,8 @@ internal class AlmacenSesion(contexto: Context) {
         const val RECORDADOS = "usuarios_recordados"
         const val INVENTARIO = "inventario_" // + co_empresa
         const val HUELLAS = "huellas"
+        const val FALLOS = "fallos_"         // + usuario
+        const val BLOQUEO = "bloqueo_"       // + usuario
         const val SIN_HUELLA = "sin_huella_" // + usuario
     }
 }

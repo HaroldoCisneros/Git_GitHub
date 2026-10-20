@@ -17,8 +17,10 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
    enviar lo contado a la toma física de Profit (Profit la cierra).
 4. Botón **Configuración** (entrada y menú) para los datos de conexión (pedido del usuario).
 5. Usuarios y accesos en base aparte `SIGUEC_PURACERAMICA` con la lógica de AppSighecMovil
-   (PBKDF2 mismo formato, bloqueo, permisos por empresa, bitácora). Sin WiFi se entra con el
-   hash guardado de la última entrada con WiFi de ese usuario en ese teléfono.
+   (PBKDF2 mismo formato, bloqueo, permisos por empresa, bitácora). La entrada es SIN
+   conexión (corregido a pedido del usuario): con el hash guardado en el teléfono; solo la
+   primera vez de cada usuario en ese teléfono va al servidor. Bloqueo local 5 claves/15 min.
+   Los permisos se refrescan al conectarse para sincronizar/abrir/enviar (actualizarSesion).
    Permisos: consultar_articulos, sincronizar_articulos, contar_inventario, cerrar_inventario.
 6. `saArticulo` confirmado con el script de la base real (ver README). Sin columna de código
    de barras: CONFIRMADO por el usuario que el código de barras viene en co_art, modelo o ref

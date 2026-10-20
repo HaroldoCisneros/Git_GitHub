@@ -105,10 +105,7 @@ class LoginViewModel(private val gestor: GestorSesion) : ViewModel() {
             when (val r = gestor.entrar(actual.usuario, clave)) {
                 is Resultado.Exito -> {
                     // La clave no se queda en la pantalla
-                    _estado.update {
-                        it.copy(clave = "", mensajeAviso = if (r.valor.sinConexion)
-                            "Entró sin WiFi: puede contar; para sincronizar o enviar necesita el WiFi." else null)
-                    }
+                    _estado.update { it.copy(clave = "", mensajeAviso = null) }
                     if (!porHuella && puedeHuella && gestor.ofrecerHuella(actual.usuario)) {
                         // Antes de ir al menú se pregunta si quiere entrar con huella la próxima vez
                         claveParaHuella = clave
