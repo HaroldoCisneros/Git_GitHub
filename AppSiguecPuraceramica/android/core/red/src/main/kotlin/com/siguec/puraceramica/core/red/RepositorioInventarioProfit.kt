@@ -56,7 +56,7 @@ class RepositorioInventarioProfit(
 
     /**
      * Envía lo contado a Profit como un RESULTADO DE INVENTARIO del inventario físico.
-     * Cada envío (cada teléfono) es un resultado aparte: num_resinv = prefijo + número del envío.
+     * Cada envío (cada teléfono) es un resultado aparte; num_resinv = correlativo de Profit.
      * @param renglones los conteos individuales del teléfono (se suman por artículo para Profit)
      */
     suspend fun enviar(
@@ -92,7 +92,8 @@ class RepositorioInventarioProfit(
                 "VALUES (?, ?, ?, ?, ?, ?)",
             renglones.map { listOf(envioId, it.coArt, it.codigoLeido, it.cantidad, it.usuario, it.fecha) }
         )
-        val numResinv = TomaFisica2K12.numeroResultado(cfg.prefijoResultado, envioId)
+        // Correlativo de Profit (psObtenerProximoNumero), dentro de esta misma transacción
+        val numResinv = tomaFisica.proximoNumero(cx, cfg)
         cx.ejecutar("UPDATE $app.dbo.envios SET num_resinv = ? WHERE id = ?", numResinv, envioId)
 
         // 2. Resultado de inventario en Profit (Profit se encarga de procesarlo y cerrar el inventario)

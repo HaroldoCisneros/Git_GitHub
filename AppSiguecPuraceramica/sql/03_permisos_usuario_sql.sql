@@ -46,9 +46,15 @@ GRANT SELECT          ON dbo.saArtUnidad          TO siguec_puraceramica;  -- Un
 GRANT SELECT          ON dbo.saStockAlmacen       TO siguec_puraceramica;  -- Existencia teórica
 GRANT SELECT, INSERT  ON dbo.saResInventario      TO siguec_puraceramica;  -- Encabezado del resultado
 GRANT INSERT          ON dbo.saResInventarioReng  TO siguec_puraceramica;  -- Renglones del resultado
--- Procedimientos de Profit (Softech) que graban los renglones y la pista de auditoría
-GRANT EXECUTE ON dbo.pInsertarRenglonesResInventario TO siguec_puraceramica;
-GRANT EXECUTE ON dbo.pInsertarPista                  TO siguec_puraceramica;
+-- Procedimientos de Profit (Softech) que graban el resultado con su pista de auditoría
+-- (pInsertarPista lo llaman ellos por dentro y solo hace INSERT en saPista: por el encadenamiento
+--  de propietario dbo no necesita permiso aparte; usuario char(6) y maquina varchar(60), la App los recorta)
+GRANT EXECUTE ON dbo.pInsertarResInventario          TO siguec_puraceramica;  -- Encabezado
+GRANT EXECUTE ON dbo.pInsertarRenglonesResInventario TO siguec_puraceramica;  -- Renglones
+-- Correlativo del resultado (sql/06). Usa SQL dinámico: por eso necesita también el
+-- SELECT en saResInventario que se dio arriba.
+IF OBJECT_ID('dbo.psObtenerProximoNumero') IS NOT NULL
+    GRANT EXECUTE ON dbo.psObtenerProximoNumero TO siguec_puraceramica;
 -- Costo unitario de cada renglón (función de la empresa, ver sql/05_funcion_ultimo_costo.sql)
 IF OBJECT_ID('dbo.ConsultarUltimoCosto') IS NOT NULL
     GRANT EXECUTE ON dbo.ConsultarUltimoCosto TO siguec_puraceramica;

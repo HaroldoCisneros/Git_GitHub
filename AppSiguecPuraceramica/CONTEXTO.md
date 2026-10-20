@@ -36,7 +36,8 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 
 10. **Enviar** = resultado de inventario de Profit (`saResInventario` + `saResInventarioReng`),
     con co_us_in / co_sucu_in del REGISTRO del inventario (pedido del usuario; se guardan al
-    abrir, en el teléfono y en aperturas). num_resinv = 'APP' + id del envío. Cada teléfono
+    abrir, en el teléfono y en aperturas). num_resinv = correlativo de Profit con
+    dbo.psObtenerProximoNumero (sql/06), dentro de la transacción del envío. Cada teléfono
     = un resultado (uso normal: UN teléfono por almacén/inventario abierto; el usuario aceptó
     dejar así el caso de varios). co_uni = unidad principal de saArtUnidad; total_art_teo de
     saStockAlmacen; cost_unit = dbo.ConsultarUltimoCosto(saArticulo.rowguid) (función de la
@@ -48,11 +49,7 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 - `saArtUnidad`: columna que marca la unidad principal (se usa uni_principal o equivalencia = 1
   si existen). `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
 - Moneda del resultado (`profit.co_mone`).
-- **Correlativo de Profit para num_resinv**: el usuario está averiguando la tabla de
-  consecutivos; mientras tanto queda 'APP' + número del envío.
-- **Procedimiento del encabezado del resultado** (`pInsertarResInventario`): el usuario pasó
-  pInsertarRenglonesResInventario (ya en uso para los renglones) y pInsertarInventarioFisico
-  (es el del inventario físico, no del resultado). Mientras tanto el encabezado va con INSERT
-  + EXEC pInsertarPista (mismo patrón de Softech).
+- Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
+  (procedimientos de Softech, con pista de auditoría).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
   :core:red sí se compiló y probó: 17 pruebas OK).

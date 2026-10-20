@@ -28,9 +28,10 @@ data class ConfigProfit(
     val tablaCodigosBarra: String = "",
     val colCodigoBarra: String = "cod_barra",
     val colCodigoBarraArticulo: String = "co_art",
-    // Resultado de inventario (saResInventario): el número se arma con este prefijo + el
-    // número del envío (APP0000012), para no chocar con el correlativo propio de Profit
-    val prefijoResultado: String = "APP",
+    // Resultado de inventario (saResInventario): el número lo da el procedimiento de la
+    // empresa dbo.psObtenerProximoNumero (último num_resinv + 1). Prefijo opcional ("" = solo números)
+    val prefijoResultado: String = "",
+    val procedimientoNumero: String = "psObtenerProximoNumero",
     // Moneda y tasa del resultado ("" = la del último saResInventario grabado en Profit)
     val coMone: String = "",
     val tasa: String = "1",
@@ -45,7 +46,8 @@ data class ConfigProfit(
     /** null = todo bien; si no, el nombre que no es válido. */
     fun validar(): String? =
         (listOf(tablaArticulos, colCodigo, colDescripcion, colAnulado, colTipo, tablaCodigosBarra, colCodigoBarra,
-            colCodigoBarraArticulo, tablaStock, colStockTipo, colStockCantidad, funcionCosto) + columnasCodigo)
+            colCodigoBarraArticulo, tablaStock, colStockTipo, colStockCantidad, funcionCosto, procedimientoNumero) +
+            columnasCodigo)
             .filter { it.isNotEmpty() }
             .firstOrNull { !PATRON.matches(it) }
             ?.let { "Nombre no válido de tabla o columna de Profit: '$it'" }
@@ -80,6 +82,7 @@ data class ConfigProfit(
                 colCodigoBarra = v("col_codigo_barra", d.colCodigoBarra),
                 colCodigoBarraArticulo = v("col_codigo_barra_articulo", d.colCodigoBarraArticulo),
                 prefijoResultado = v("prefijo_resultado", d.prefijoResultado),
+                procedimientoNumero = v("procedimiento_numero", d.procedimientoNumero),
                 coMone = v("co_mone", d.coMone),
                 tasa = v("tasa", d.tasa),
                 tablaStock = v("tabla_stock", d.tablaStock),

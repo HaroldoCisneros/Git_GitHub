@@ -43,6 +43,9 @@ interface TomaFisicaProfit {
     /** ¿Sigue sin procesar en Profit? (antes de abrir y antes de enviar). */
     fun estaAbierta(cx: Conexion, numero: String): Boolean
 
+    /** Próximo número de resultado de inventario (correlativo de Profit). */
+    fun proximoNumero(cx: Conexion, cfg: ConfigProfit): String
+
     /** Graba lo contado en Profit (un resultado de inventario). */
     fun enviar(cx: Conexion, cfg: ConfigProfit, envio: EnvioProfit)
 
@@ -64,8 +67,9 @@ interface TomaFisicaProfit {
  *                        cost_unit (= dbo.ConsultarUltimoCosto(saArticulo.rowguid)), co_us_in/mo,
  *                        co_sucu_in/mo, fe_us_in/mo.
  *                        (validador = timestamp y rowguid = newid() los pone SQL Server)
- *   pInsertarRenglonesResInventario  Procedimiento de Softech que graba cada renglón y su pista.
- *   pInsertarPista                   Auditoría de Profit (se llama para el encabezado).
+ *   pInsertarResInventario           Procedimiento de Softech: encabezado del resultado + su pista.
+ *   pInsertarRenglonesResInventario  Procedimiento de Softech: cada renglón + su pista.
+ *   psObtenerProximoNumero           Procedimiento de la empresa: correlativo de num_resinv.
  */
 object TomaFisica2K12 : TomaFisicaProfit {
 
@@ -82,18 +86,12 @@ object TomaFisica2K12 : TomaFisicaProfit {
     private const val SQL_ULTIMA_MONEDA =
         "SELECT TOP 1 RTRIM(co_mone) AS co_mone FROM dbo.saResInventario ORDER BY fe_us_in DESC"
 
-    // Encabezado: INSERT + pista de auditoría de Profit (igual que hacen los procedimientos de Softech).
-    // OUTPUT devuelve la fecha y el rowguid que pone SQL Server, para la pista.
-    private const val SQL_ENCABEZADO = """SET NOCOUNT ON;
-        DECLARE @t TABLE (fe_us_in datetime, rowguid uniqueidentifier);
-        INSERT INTO dbo.saResInventario (num_resinv, des_resinv, fecha, co_invfisico, co_alma,
-            co_mone, tasa, co_us_in, co_sucu_in, fe_us_in, co_us_mo, co_sucu_mo, fe_us_mo)
-        OUTPUT inserted.fe_us_in, inserted.rowguid INTO @t
-        VALUES (?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, GETDATE());
-        SELECT fe_us_in, CAST(rowguid AS char(36)) AS rowguid FROM @t"""
-
-    private const val SQL_PISTA = """EXEC dbo.pInsertarPista @sUsuario_Id = ?, @dtFecha = ?, @sCo_Sucu = ?,
-        @sTablaOri = 'saResInventario', @rowguidOri = ?, @sTipo_Op = 'I', @sMaquina = ?, @sCampos = ?"""
+    // Encabezado: el procedimiento de Profit (graba el resultado y su pista de auditoría).
+    // @sdFecha no admite GETDATE() directo en el EXEC: va en una variable (hora del servidor).
+    private const val SQL_ENCABEZADO = """SET NOCOUNT ON; DECLARE @fecha smalldatetime = GETDATE();
+        EXEC dbo.pInsertarResInventario @sNum_ResInv = ?, @sDes_ResInv = ?, @sdFecha = @fecha,
+        @sCo_InvFisico = ?, @sCo_Alma = ?, @sCo_Mone = ?, @deTasa = ?, @sCo_Us_In = ?, @sCo_Sucu_In = ?,
+        @sMaquina = ?, @sRevisado = NULL, @sTrasnfe = NULL"""
 
     // Renglones: el procedimiento de Profit (graba el renglón y su pista)
     private const val SQL_RENGLON = """EXEC dbo.pInsertarRenglonesResInventario @sNum_ResInv = ?, @iReng_Num = ?,
@@ -151,11 +149,9 @@ object TomaFisica2K12 : TomaFisicaProfit {
 
         val maquina = envio.maquina.take(60)
 
-        // Encabezado + su pista
-        val creado = cx.consultarUno(SQL_ENCABEZADO, envio.numResinv, envio.descripcion.take(60), envio.numero,
-            envio.coAlma, moneda, BigDecimal(cfg.tasa), us, sucu, us, sucu)
-            ?: throw ErrorApp("Profit no devolvió el resultado de inventario creado.", TipoError.SERVIDOR)
-        cx.ejecutarProcedimiento(SQL_PISTA, us, creado["fe_us_in"], sucu, creado["rowguid"], maquina, envio.numResinv)
+        // Encabezado (con su pista) con el procedimiento de Profit
+        cx.ejecutarProcedimiento(SQL_ENCABEZADO, envio.numResinv, envio.descripcion.take(60), envio.numero,
+            envio.coAlma, moneda, BigDecimal(cfg.tasa), us, sucu, maquina)
 
         // Renglones: uno por artículo (UK num_resinv + co_art), numerados desde 1, con el procedimiento de Profit
         codigos.forEachIndexed { i, coArt ->
@@ -227,6 +223,29 @@ object TomaFisica2K12 : TomaFisicaProfit {
         cx.consultar("SELECT LOWER(COLUMN_NAME) AS columna FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?", tabla)
             .map { it.texto("columna") }.toSet()
 
-    /** "APP" + número del envío con ceros a la izquierda: APP0000012 (máximo 20 caracteres). */
-    fun numeroResultado(prefijo: String, envioId: Int): String = prefijo + envioId.toString().padStart(7, '0')
+    /**
+     * Correlativo con el procedimiento de la empresa dbo.psObtenerProximoNumero: último
+     * saResInventario.num_resinv (con ese prefijo y solo dígitos después) + 1, respetando los ceros
+     * a la izquierda. Lee con UPDLOCK + HOLDLOCK: dentro de la transacción del envío, dos teléfonos
+     * que envían a la vez no pueden recibir el mismo número.
+     */
+    override fun proximoNumero(cx: Conexion, cfg: ConfigProfit): String {
+        val procedimiento = cfg.procedimientoNumero
+        if (cx.consultarUno("SELECT OBJECT_ID(?) AS id", "dbo.$procedimiento")?.get("id") == null) {
+            throw ErrorApp("No existe el procedimiento dbo.$procedimiento en la base de Profit (correlativo del " +
+                "resultado de inventario). Ejecute sql/06_procedimiento_proximo_numero.sql.", TipoError.SERVIDOR)
+        }
+        val numero = cx.consultarUno(
+            "SET NOCOUNT ON; DECLARE @p varchar(50); EXEC dbo.[$procedimiento] @sTabla = 'saResInventario', " +
+                "@sCampo = 'num_resinv', @sPrefijo = ?, @sProximo = @p OUTPUT",
+            cfg.prefijoResultado
+        )?.texto("proximonumero").orEmpty()
+        if (numero.isEmpty() || numero.length > LARGO_NUM_RESINV) {
+            throw ErrorApp("El correlativo del resultado de inventario no es válido: '$numero'.", TipoError.SERVIDOR)
+        }
+        return numero
+    }
+
+    /** saResInventario.num_resinv es char(20). */
+    private const val LARGO_NUM_RESINV = 20
 }

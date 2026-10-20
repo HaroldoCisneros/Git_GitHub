@@ -85,10 +85,12 @@ class ConexionTest {
 
     @Test
     fun numeroDelResultadoDeInventario() {
-        // saResInventario.num_resinv es char(20)
-        assertEquals("APP0000012", TomaFisica2K12.numeroResultado("APP", 12))
-        assertTrue(TomaFisica2K12.numeroResultado("ABCDEFGHIJ", Int.MAX_VALUE).length <= 20)
+        // El número lo da psObtenerProximoNumero; por defecto sin prefijo (solo dígitos, como Profit)
+        assertEquals("", ConfigProfit().prefijoResultado)
+        assertEquals("psObtenerProximoNumero", ConfigProfit().procedimientoNumero)
+        assertEquals("INV", ConfigProfit.desdeParametros(mapOf("profit.prefijo_resultado" to "INV")).prefijoResultado)
         assertNotNull(ConfigProfit(prefijoResultado = "AP P").validar())
+        assertNotNull(ConfigProfit(procedimientoNumero = "p; DROP TABLE x").validar())
         assertNotNull(ConfigProfit(tasa = "0").validar())
         assertNull(ConfigProfit.desdeParametros(mapOf("profit.co_mone" to "BS")).validar())
         // Costo unitario: función de la empresa (nombre validado porque va dentro del SQL)

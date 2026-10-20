@@ -93,7 +93,7 @@ GO
    Solo si en su Profit 2K12 algún nombre es distinto al de fábrica.
    Ejemplos:
      INSERT INTO dbo.parametros VALUES ('profit.co_mone', 'BS');            -- Moneda del resultado
-     INSERT INTO dbo.parametros VALUES ('profit.prefijo_resultado', 'APP'); -- num_resinv = APP0000012
+     INSERT INTO dbo.parametros VALUES ('profit.prefijo_resultado', 'INV'); -- Prefijo del correlativo (vacío = solo números)
    Claves válidas: ver android/core/red/.../ConfigProfit.kt                  */
 IF OBJECT_ID('dbo.parametros') IS NULL
 CREATE TABLE dbo.parametros (
@@ -129,7 +129,8 @@ GO
 
 /* ---------- envios (auditoría de lo enviado a Profit) ----------
    Cada envío de un teléfono crea en Profit UN resultado de inventario
-   (saResInventario + saResInventarioReng) con num_resinv = 'APP' + id del envío. */
+   (saResInventario + saResInventarioReng); num_resinv = correlativo de Profit
+   (dbo.psObtenerProximoNumero). */
 IF OBJECT_ID('dbo.envios') IS NULL
 CREATE TABLE dbo.envios (
     id            int IDENTITY(1,1) NOT NULL CONSTRAINT pk_envios PRIMARY KEY,

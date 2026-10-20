@@ -88,7 +88,7 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 
 | Campo | Valor |
 |---|---|
-| `saResInventario.num_resinv` | `APP` + número del envío (`APP0000012`): no choca con el correlativo de Profit (prefijo en `profit.prefijo_resultado`) |
+| `saResInventario.num_resinv` | **Correlativo de Profit**: `dbo.psObtenerProximoNumero` (último `num_resinv` + 1, con sus ceros a la izquierda), en la misma transacción del envío. Prefijo opcional en `profit.prefijo_resultado` (vacío = solo números) |
 | `des_resinv` | `App <usuario> <teléfono>` |
 | `fecha`, `fe_us_in`, `fe_us_mo` | Hora del servidor |
 | `co_invfisico`, `co_alma` | Los del inventario abierto (si el inventario no tiene almacén, no se puede enviar) |
@@ -101,9 +101,9 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 | `cost_unit` | `dbo.ConsultarUltimoCosto(saArticulo.rowguid)`: último costo de entrada (sin REPO ni PROV) |
 | `sco_uni`, `stotal_art_teo`, `stotal_art` | NULL / 0 / 0 |
 
-Los **renglones** se graban con el procedimiento de Profit `pInsertarRenglonesResInventario`
-y el **encabezado** con INSERT + `pInsertarPista`: así todo queda en la **pista de auditoría
-de Profit** (con el teléfono como máquina), igual que si se cargara en Profit.
+El **encabezado** se graba con el procedimiento de Profit `pInsertarResInventario` y los
+**renglones** con `pInsertarRenglonesResInventario`: así todo queda en la **pista de
+auditoría de Profit** (con el teléfono como máquina), igual que si se cargara en Profit.
 
 Uso normal: **un teléfono por almacén / inventario abierto**. Si varios teléfonos
 cuentan el mismo inventario, cada uno envía **su propio resultado**.

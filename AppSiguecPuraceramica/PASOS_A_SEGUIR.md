@@ -20,8 +20,10 @@ Ejecutar en este orden (carpeta `sql/`):
    Crea el usuario de SQL `siguec_puraceramica` con lo mínimo: su base, solo lectura en
    `saArticulo`, `saInventarioFisico`, `saAlmacen`, `saArtUnidad` y `saStockAlmacen`, e
    INSERT en `saResInventario` y `saResInventarioReng` (el resultado de lo contado), y
-   EXECUTE en los procedimientos de Profit `pInsertarRenglonesResInventario` y
-   `pInsertarPista` (así queda la pista de auditoría de Profit), y en la función `ConsultarUltimoCosto` (costo unitario de cada renglón; si su base
+   EXECUTE en los procedimientos de Profit `pInsertarResInventario` y
+   `pInsertarRenglonesResInventario` (así queda la pista de auditoría de Profit), en `psObtenerProximoNumero`
+   (correlativo del resultado; si no existe, ejecute antes `06_procedimiento_proximo_numero.sql`)
+   y en la función `ConsultarUltimoCosto` (costo unitario de cada renglón; si su base
    no la tiene, ejecute antes `05_funcion_ultimo_costo.sql`).
 4. **Registrar la empresa** (use el nombre real de la base):
    ```sql
@@ -97,7 +99,8 @@ Ejecutar en este orden (carpeta `sql/`):
    Cada conteo queda a nombre de quien cuenta; se puede borrar un conteo propio.
 4. **Artículos**: consulta código, descripción y stock contado del inventario elegido.
 5. **Cerrar** (con WiFi): Inventarios → **Enviar a Profit**. Se crea en Profit un
-   **resultado de inventario** (`saResInventario` / `saResInventarioReng`, número `APP...`)
+   **resultado de inventario** (`saResInventario` / `saResInventarioReng`, con el **correlativo
+   de Profit** de `psObtenerProximoNumero`)
    con el usuario y la sucursal del registro del inventario y el **último costo** de cada
    artículo (`ConsultarUltimoCosto`). Lo normal es **un teléfono por almacén / inventario
    abierto**; si cuentan varios, cada uno envía su propio resultado. Luego, en Profit, se
@@ -109,8 +112,6 @@ Ejecutar en este orden (carpeta `sql/`):
   envía el suyo). Pruebe primero con dos teléfonos y pocos artículos.
 - La **unidad** de cada renglón sale de `saArtUnidad` (la principal): revise en Profit que
   el resultado se vea bien antes de procesarlo.
-- El número del resultado es `APP` + número del envío mientras se confirma la tabla de
-  correlativos de Profit.
 
 ## Si algo falla
 
@@ -123,6 +124,7 @@ Ejecutar en este orden (carpeta `sql/`):
 | "No hay ningún artículo con el código..." | Sincronizar artículos; revisar que el código esté en co_art, modelo o ref. |
 | "No se sabe la moneda del resultado" | Paso 1.6 (`profit.co_mone`). |
 | "Estos artículos no tienen unidad en Profit" | Asignarles unidad en Profit (saArtUnidad). |
+| "No existe el procedimiento dbo.psObtenerProximoNumero" | Ejecutar `sql/06_procedimiento_proximo_numero.sql` y luego `03_permisos_usuario_sql.sql`. |
 | "No existe la función dbo.ConsultarUltimoCosto" | Ejecutar `sql/05_funcion_ultimo_costo.sql` y luego `03_permisos_usuario_sql.sql`. |
 | "El inventario ... no tiene almacén" | El inventario físico de Profit debe tener almacén para enviar el resultado. |
 | La etiqueta no lee | Tamaño/nitidez de la impresión; el código debe ir entre `*` y con margen blanco. |
