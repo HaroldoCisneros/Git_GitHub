@@ -31,7 +31,7 @@ class LogicaTest {
         assertEquals(-1, Inventario.signo("-1"))
         assertEquals("Sin contar", Inventario.contado(null))
         assertEquals("Contado: 8,5", Inventario.contado("8.5"))
-        assertEquals("Toma N° 15 · Almacén 01 PRINCIPAL",
+        assertEquals("Inventario 15 · Almacén 01 PRINCIPAL",
             Inventario.titulo(InventarioDto(id = 3, numero = "15", coAlma = "01", desAlma = "PRINCIPAL")))
     }
 
@@ -47,6 +47,12 @@ class LogicaTest {
         assertEquals("CER-001", Inventario.limpiarCodigo(" *CER-001* "))
         assertEquals("CER-001", Inventario.limpiarCodigo("CER-001"))
         assertNotNull(Inventario.validarCantidad("0,0000001"))
+    }
+
+    @Test
+    fun almacenDelInventario() {
+        assertEquals("Todos los almacenes", Inventario.almacen("", ""))
+        assertEquals("Almacén 01", Inventario.almacen("01", ""))
     }
 
     @Test

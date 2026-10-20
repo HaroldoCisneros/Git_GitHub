@@ -28,11 +28,15 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 7. Envío idempotente: clave de envío (UUID) generada en el teléfono, UNIQUE en `envios`.
 8. Cantidades como texto y sumas con BigDecimal (formato venezolano en pantalla).
 
+9. **Abrir inventario** (pedido del usuario): se consultan en Profit `saInventarioFisico`
+   con procesado = 0 (+ des_alma de saAlmacen); se elige uno, se muestran sus datos y "Abrir"
+   lo guarda con usuario y hora (teléfono + SIGUEC_PURACERAMICA.dbo.aperturas + bitácora).
+   Desde ahí se cuenta escaneando, asociado a ese inventario y su almacén. Si ya estaba
+   abierto en ese teléfono, se sigue con el mismo. Implementado en `TomaFisica2K12`.
+
 ## PENDIENTE
-- **Tablas de la toma física de Profit 2K12** (el usuario las va a pasar): implementar
-  `TomaFisicaProfit` en `android/core/red/.../TomaFisica.kt` (abiertas, estaAbierta, enviar)
-  y cambiar `TomaFisicaProfit.actual`. Definir cómo se acumulan los envíos de varios
-  teléfonos en la misma toma (sumar sobre lo existente o renglones por envío).
-  Actualizar GRANT en sql/03.
+- **Renglones de la toma física de Profit 2K12** (el usuario los va a pasar): implementar
+  `TomaFisica2K12.enviar()` en `android/core/red/.../TomaFisica.kt`. Definir cómo se
+  acumulan los envíos de varios teléfonos en el mismo inventario. Actualizar GRANT en sql/03.
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
-  :core:red sí se compiló y probó: 15 pruebas OK).
+  :core:red sí se compiló y probó: 16 pruebas OK).

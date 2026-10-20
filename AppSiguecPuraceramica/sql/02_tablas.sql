@@ -15,6 +15,8 @@
    Configuración:
        parametros       Nombres de tablas/columnas de Profit 2K12 si son distintos
                         a los de fábrica (la App los lee al conectarse).
+   Inventarios abiertos en la App:
+       aperturas        Quién abrió cada inventario físico de Profit, en qué teléfono y cuándo.
    Envíos a Profit (auditoría):
        envios           Cada envío de un conteo a la toma física de Profit.
        envio_conteos    Los conteos individuales que se enviaron (quién, qué, cuánto).
@@ -98,6 +100,25 @@ CREATE TABLE dbo.parametros (
 );
 GO
 
+/* ---------- aperturas ----------
+   Cada vez que un usuario ABRE en su teléfono un inventario físico de Profit
+   (saInventarioFisico con procesado = 0): quién, en qué teléfono y a qué hora.  */
+IF OBJECT_ID('dbo.aperturas') IS NULL
+CREATE TABLE dbo.aperturas (
+    id             int IDENTITY(1,1) NOT NULL CONSTRAINT pk_aperturas PRIMARY KEY,
+    co_empresa     varchar(30)    NOT NULL,
+    co_invfisico   varchar(20)    NOT NULL,                  -- saInventarioFisico.co_invfisico
+    co_alma        varchar(6)     NULL,                      -- Almacén del inventario
+    des_invfisico  varchar(60)    NULL,
+    usuario        varchar(30)    NOT NULL,                  -- Quién lo abrió
+    dispositivo    varchar(100)   NULL,
+    fecha          datetime       NOT NULL CONSTRAINT df_aperturas_fecha DEFAULT GETDATE()
+);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_aperturas_inventario')
+    CREATE INDEX ix_aperturas_inventario ON dbo.aperturas (co_empresa, co_invfisico);
+GO
+
 /* ---------- envios (auditoría de lo enviado a la toma física de Profit) ---------- */
 IF OBJECT_ID('dbo.envios') IS NULL
 CREATE TABLE dbo.envios (
@@ -105,7 +126,7 @@ CREATE TABLE dbo.envios (
     clave_envio   varchar(36)    NOT NULL,                   -- La genera el teléfono: si se reintenta
                                                              -- un envío que sí llegó, no se duplica
     co_empresa    varchar(30)    NOT NULL,
-    toma          varchar(30)    NOT NULL,                   -- Número de la toma física en Profit
+    toma          varchar(30)    NOT NULL,                   -- saInventarioFisico.co_invfisico
     co_alma       varchar(6)     NULL,
     usuario       varchar(30)    NOT NULL,                   -- Quién envió
     dispositivo   varchar(100)   NULL,

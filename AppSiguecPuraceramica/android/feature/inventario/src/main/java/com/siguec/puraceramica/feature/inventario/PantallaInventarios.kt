@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 // Iconos
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -61,14 +61,15 @@ import com.siguec.puraceramica.core.ui.componentes.Cargando
 import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
 
 /**
- * Pantalla "Inventarios" (tomas físicas de Profit en el teléfono).
- *  - "Traer de Profit" (WiFi): baja las tomas físicas ABIERTAS en Profit.
- *  - Cada toma: Contar (sin WiFi), Enviar a Profit (WiFi, permiso "cerrar") y,
- *    ya enviada, quitarla del teléfono.
+ * Pantalla "Inventarios": los inventarios físicos de Profit ABIERTOS en este teléfono.
+ *  - "Abrir inventario" (WiFi): elegir uno de saInventarioFisico sin procesar.
+ *  - Cada inventario: Contar (sin WiFi), Enviar a Profit (WiFi, permiso "cerrar") y,
+ *    ya enviado, quitarlo del teléfono.
  *
- * @param puedeTraer permiso "contar inventario"
+ * @param puedeAbrir permiso "contar inventario"
  * @param puedeEnviar permiso "cerrar inventario"
- * @param alContar abre la pantalla de contar en esa toma
+ * @param alAbrirNuevo abre la pantalla "Abrir inventario"
+ * @param alContar abre la pantalla de contar en ese inventario
  */
 @OptIn(ExperimentalLayoutApi::class) // FlowRow
 @Composable
@@ -76,8 +77,9 @@ fun PantallaInventarios(
     gestor: GestorSesion,
     coEmpresa: String,
     nombreEmpresa: String,
-    puedeTraer: Boolean,
+    puedeAbrir: Boolean,
     puedeEnviar: Boolean,
+    alAbrirNuevo: () -> Unit,
     alContar: (Int) -> Unit,
     alVolver: () -> Unit
 ) {
@@ -101,14 +103,14 @@ fun PantallaInventarios(
     Scaffold(
         topBar = { BarraSuperior(titulo = "Inventarios", subtitulo = nombreEmpresa, alVolver = alVolver) },
         floatingActionButton = {
-            if (puedeTraer) {
+            if (puedeAbrir) {
                 ExtendedFloatingActionButton(
-                    onClick = { if (!estado.trabajando) vm.traerDeProfit() },
+                    onClick = { if (!estado.trabajando) alAbrirNuevo() },
                     icon = {
                         if (estado.trabajando) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Filled.CloudDownload, contentDescription = null)
+                        else Icon(Icons.Filled.LockOpen, contentDescription = null)
                     },
-                    text = { Text("Traer de Profit") }
+                    text = { Text("Abrir inventario") }
                 )
             }
         },
@@ -118,8 +120,8 @@ fun PantallaInventarios(
             when {
                 estado.cargando -> Cargando()
                 estado.inventarios.isEmpty() -> MensajeVacio(
-                    "No hay inventarios en este teléfono. Con el WiFi de la empresa toque \"Traer de Profit\" " +
-                        "para bajar las tomas físicas abiertas.")
+                    "No hay inventarios abiertos en este teléfono. Con el WiFi de la empresa toque " +
+                        "\"Abrir inventario\" y elija uno de los creados en Profit.")
                 else -> LazyColumn(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -138,9 +140,9 @@ fun PantallaInventarios(
             onDismissRequest = { enviando = null },
             title = { Text("Enviar a Profit") },
             text = {
-                Text("Conéctese al WiFi de la empresa. Se envían a la toma física N° ${inv.numero} los ${inv.conteos} " +
+                Text("Conéctese al WiFi de la empresa. Se envían al inventario ${inv.numero} los ${inv.conteos} " +
                     "conteos de este teléfono (${inv.articulosContados} artículos). Después ya no se podrá contar " +
-                    "aquí; la toma se cierra en Profit.")
+                    "aquí; el inventario se cierra en Profit.")
             },
             confirmButton = { TextButton(onClick = { enviando = null; vm.enviar(inv) }) { Text("Enviar") } },
             dismissButton = { TextButton(onClick = { enviando = null }) { Text("Cancelar") } }
@@ -150,14 +152,14 @@ fun PantallaInventarios(
         AlertDialog(
             onDismissRequest = { quitando = null },
             title = { Text("Quitar del teléfono") },
-            text = { Text("La toma N° ${inv.numero} ya se envió a Profit. ¿Quitarla de este teléfono con sus conteos?") },
+            text = { Text("El inventario ${inv.numero} ya se envió a Profit. ¿Quitarlo de este teléfono con sus conteos?") },
             confirmButton = { TextButton(onClick = { quitando = null; vm.borrarEnviado(inv) }) { Text("Quitar") } },
             dismissButton = { TextButton(onClick = { quitando = null }) { Text("Cancelar") } }
         )
     }
 }
 
-/** Una toma: almacén, estado, avance y sus botones. */
+/** Un inventario: almacén, quién lo abrió, avance y sus botones. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TarjetaInventario(
@@ -174,11 +176,17 @@ private fun TarjetaInventario(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(Inventario.titulo(inv), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             if (inv.descripcion.isNotBlank()) Text(inv.descripcion, style = MaterialTheme.typography.bodyMedium)
-            inv.fecha?.let { Text("Abierta en Profit el ${Formato.fecha(it)}", style = MaterialTheme.typography.bodySmall) }
+            inv.fecha?.let { Text("Inicio en Profit: ${Formato.fecha(it)}", style = MaterialTheme.typography.bodySmall) }
+            Text("Abierto en la App por ${inv.abiertoPor}" + (inv.fechaApertura?.let { " el " + Formato.fecha(it) } ?: ""),
+                style = MaterialTheme.typography.bodySmall)
+            if (inv.artCero) {
+                Text("Los artículos no contados quedan en CERO al cerrarlo en Profit",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             Text("En este teléfono: ${inv.articulosContados} artículos contados · ${inv.conteos} conteos",
                 style = MaterialTheme.typography.bodySmall)
             if (!inv.abierto) {
-                Text("ENVIADA a Profit por ${inv.enviadoPor}" + (inv.fechaEnvio?.let { " el " + Formato.fecha(it) } ?: ""),
+                Text("ENVIADO a Profit por ${inv.enviadoPor}" + (inv.fechaEnvio?.let { " el " + Formato.fecha(it) } ?: ""),
                     style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
             // FlowRow: si los botones no caben en una fila, bajan a la siguiente

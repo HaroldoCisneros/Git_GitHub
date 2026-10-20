@@ -12,7 +12,8 @@ import android.database.sqlite.SQLiteOpenHelper
  *   articulos         Copia de saArticulo (la llena "Sincronizar").
  *   codigos           Lo que se puede escanear de cada artículo (co_art, modelo, ref, barras).
  *   sincronizaciones  Última sincronización por empresa.
- *   inventarios       Tomas físicas abiertas traídas de Profit (abierto = 0 cuando ya se envió).
+ *   inventarios       Inventarios físicos de Profit ABIERTOS en el teléfono (con quién y cuándo
+ *                     los abrió); abierto = 0 cuando ya se envió a Profit.
  *   conteos           Cada conteo individual: quién, qué artículo, código leído y cuánto.
  *
  * Las cantidades se guardan como TEXTO ("2.5") y se suman con BigDecimal
@@ -35,6 +36,8 @@ internal class BaseLocal(contexto: Context) :
         db.execSQL("""CREATE TABLE inventarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT, co_empresa TEXT NOT NULL, numero TEXT NOT NULL,
             co_alma TEXT NOT NULL, des_alma TEXT NOT NULL, descripcion TEXT NOT NULL, fecha TEXT,
+            art_cero INTEGER NOT NULL DEFAULT 0,    -- Profit pone en 0 los no contados
+            abierto_por TEXT, fecha_apertura TEXT,  -- Quién lo abrió en la App y cuándo
             abierto INTEGER NOT NULL DEFAULT 1, enviado_por TEXT, fecha_envio TEXT,
             clave_envio TEXT,                       -- Se genera al primer intento de envío (no duplica)
             UNIQUE (co_empresa, numero))""")
@@ -45,11 +48,16 @@ internal class BaseLocal(contexto: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, anterior: Int, nueva: Int) {
-        // Versión 1: todavía no hay cambios de estructura
+        // Versión 2: apertura del inventario (quién y cuándo) y art_cero
+        if (anterior < 2) {
+            db.execSQL("ALTER TABLE inventarios ADD COLUMN art_cero INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE inventarios ADD COLUMN abierto_por TEXT")
+            db.execSQL("ALTER TABLE inventarios ADD COLUMN fecha_apertura TEXT")
+        }
     }
 
     companion object {
         const val NOMBRE = "siguec_local.db"
-        const val VERSION = 1
+        const val VERSION = 2
     }
 }

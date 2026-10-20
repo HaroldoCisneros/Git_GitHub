@@ -35,6 +35,7 @@ import com.siguec.puraceramica.feature.articulos.PantallaArticulos
 import com.siguec.puraceramica.feature.conteo.PantallaConteo
 import com.siguec.puraceramica.feature.conteo.PantallaElegirInventario
 import com.siguec.puraceramica.feature.inicio.PantallaInicio
+import com.siguec.puraceramica.feature.inventario.PantallaAbrirInventario
 import com.siguec.puraceramica.feature.inventario.PantallaInventarios
 import com.siguec.puraceramica.feature.login.PantallaCambiarEmpresa
 import com.siguec.puraceramica.feature.login.PantallaConfiguracion
@@ -66,9 +67,10 @@ private const val RUTA_CONFIGURACION = "configuracion" // Datos de la conexión 
 private const val RUTA_INICIO = "inicio"            // Menú principal
 private const val RUTA_EMPRESAS = "empresas"        // Cambiar empresa
 private const val RUTA_ARTICULOS = "articulos"      // Consultar y sincronizar artículos
-private const val RUTA_INVENTARIOS = "inventarios"  // Traer tomas de Profit y enviar lo contado
-private const val RUTA_ELEGIR = "elegir-inventario" // ¿En qué toma abierta va a contar?
-private const val RUTA_CONTEO = "conteo"            // Contar escaneando (una toma)
+private const val RUTA_INVENTARIOS = "inventarios"  // Inventarios abiertos en el teléfono y enviar
+private const val RUTA_ABRIR = "abrir-inventario"   // Abrir un inventario físico de Profit
+private const val RUTA_ELEGIR = "elegir-inventario" // ¿En qué inventario abierto va a contar?
+private const val RUTA_CONTEO = "conteo"            // Contar escaneando (un inventario)
 private const val RUTA_USUARIOS = "usuarios"        // Administración: usuarios
 private const val RUTA_USUARIO = "usuario"          // Administración: un usuario
 private const val RUTA_BITACORA = "bitacora"        // Administración: bitácora
@@ -160,21 +162,38 @@ private fun Navegacion(gestor: GestorSesion, alSalir: () -> Unit) {
             )
         }
 
-        // ---------- Inventarios: traer de Profit y enviar (WiFi) ----------
+        // ---------- Inventarios abiertos en el teléfono; enviar a Profit (WiFi) ----------
         composable(RUTA_INVENTARIOS) {
             val a = ambiente ?: return@composable
             PantallaInventarios(
                 gestor = gestor,
                 coEmpresa = a.coEmpresa,
                 nombreEmpresa = a.nombre,
-                puedeTraer = a.permisos.contarInventario,
+                puedeAbrir = a.permisos.contarInventario,
                 puedeEnviar = a.permisos.cerrarInventario,
+                alAbrirNuevo = { nav.navigate(RUTA_ABRIR) },
                 alContar = { id -> gestor.recordarInventario(id); nav.navigate("$RUTA_CONTEO/$id") },
                 alVolver = { nav.popBackStack() }
             )
         }
 
-        // ---------- ¿En qué toma abierta va a contar? ----------
+        // ---------- Abrir un inventario físico de Profit (WiFi) ----------
+        composable(RUTA_ABRIR) {
+            val a = ambiente ?: return@composable
+            PantallaAbrirInventario(
+                gestor = gestor,
+                coEmpresa = a.coEmpresa,
+                nombreEmpresa = a.nombre,
+                // Abierto: se pasa a contar (y "volver" regresa a Inventarios, no a esta pantalla)
+                alAbierto = { id ->
+                    gestor.recordarInventario(id)
+                    nav.navigate("$RUTA_CONTEO/$id") { popUpTo(RUTA_ABRIR) { inclusive = true } }
+                },
+                alVolver = { nav.popBackStack() }
+            )
+        }
+
+        // ---------- ¿En qué inventario abierto va a contar? ----------
         composable(RUTA_ELEGIR) {
             val a = ambiente ?: return@composable
             PantallaElegirInventario(

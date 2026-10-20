@@ -38,7 +38,8 @@ GRANT SELECT ON dbo.saArticulo TO siguec_puraceramica;   -- Sincronizar artícul
 -- Si los códigos de barra están en una tabla aparte (parámetro profit.tabla_codigos_barra):
 -- GRANT SELECT ON dbo.NOMBRE_TABLA_CODIGOS TO siguec_puraceramica;
 
--- PENDIENTE (tablas de toma física de Profit 2K12, por confirmar):
--- GRANT SELECT ON dbo.<encabezado de la toma física> TO siguec_puraceramica;  -- Tomas abiertas
--- GRANT SELECT, INSERT, UPDATE ON dbo.<renglones de la toma física> TO siguec_puraceramica;  -- Enviar lo contado
+GRANT SELECT ON dbo.saInventarioFisico TO siguec_puraceramica;  -- Inventarios sin procesar (abrir)
+GRANT SELECT ON dbo.saAlmacen          TO siguec_puraceramica;  -- Nombre del almacén
+-- PENDIENTE (renglones de la toma física, para enviar lo contado):
+-- GRANT SELECT, INSERT, UPDATE ON dbo.<renglones de la toma física> TO siguec_puraceramica;
 GO

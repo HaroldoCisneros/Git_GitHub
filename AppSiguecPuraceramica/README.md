@@ -25,13 +25,13 @@ intermedio) y **solo** para:
 |---|---|---|
 | **Entrar** | Verifica usuario y clave en `SIGUEC_PURACERAMICA` (misma lógica de AppSighecMovil: PBKDF2, 5 claves erradas = 15 min bloqueado). **Sin WiFi** entra con la clave de la última vez que ese usuario entró con WiFi en ese teléfono. | — |
 | **Sincronizar artículos** | Baja `saArticulo` (código, descripción, anulado, modelo, ref; sin los servicios `tipo = 'S'`) al teléfono, con los códigos para escanear. | `sincronizar_articulos` |
-| **Traer inventarios** | Trae las **tomas físicas abiertas en Profit** al teléfono. | `contar_inventario` |
+| **Abrir inventario** | Consulta en Profit los inventarios físicos creados y sin procesar (`saInventarioFisico.procesado = 0`, con el nombre del almacén de `saAlmacen`). Se elige uno, se ven sus datos y se toca **Abrir**: queda en el teléfono con el **usuario y la hora** (también en `SIGUEC_PURACERAMICA.dbo.aperturas` y la bitácora). | `contar_inventario` |
 | **Enviar (cerrar)** | Manda lo contado a la **toma física de Profit** (y deja auditoría en `envios` / `envio_conteos`). Profit se encarga de cerrarla. | `cerrar_inventario` |
 
 Todo lo demás es **sin WiFi**, en la base del teléfono:
 
 - **Artículos**: consulta de código, descripción y stock contado (si ya se contó en la toma elegida).
-- **Contar**: se elige la toma abierta y se **escanea** el código de barras; muestra el
+- **Contar**: se elige el inventario abierto (asociado a su almacén) y se **escanea** el código de barras; muestra el
   artículo y lo ya contado; se escribe la cantidad y "Anotar". **Modo rápido**: cada
   escaneo anota 1. Cada conteo es **individual** (queda a nombre de quien cuenta);
   el stock contado es la suma. Se puede borrar un conteo propio mientras no se haya enviado.
@@ -77,9 +77,13 @@ se cambia la App: se agrega un renglón en `SIGUEC_PURACERAMICA.dbo.parametros`:
 | `profit.tipos_excluidos` | `S` |
 | `profit.tabla_codigos_barra` / `profit.col_codigo_barra` / `profit.col_codigo_barra_articulo` | vacío / `cod_barra` / `co_art` |
 
-**PENDIENTE: tablas de la toma física de Profit 2K12.** Todo su SQL va en UN solo
-archivo (`android/core/red/.../TomaFisica.kt`): leer las tomas abiertas y grabar
-lo contado. Mientras tanto, "Traer de Profit" y "Enviar" avisan que falta configurarlas.
+**Toma física (`saInventarioFisico`)**: `co_invfisico char(20)`, `des_invfisico`,
+`co_alma` (puede venir vacío = todos los almacenes), `inicio`, `art_cero` (los no
+contados quedan en cero al cerrarlo) y `procesado` (0 iniciado, 1 cerrado). Todo su SQL
+está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
+
+**PENDIENTE: la tabla de renglones de la toma física** (dónde va lo contado por
+artículo). Mientras tanto "Enviar a Profit" avisa que falta configurarla.
 
 ## Instalación
 
@@ -94,7 +98,7 @@ lo contado. Mientras tanto, "Traer de Profit" y "Enviar" avisan que falta config
 
 ## Uso típico
 1. En Profit se abre la toma física del almacén.
-2. Con WiFi: **Sincronizar artículos** y **Inventarios → Traer de Profit**.
+2. Con WiFi: **Sincronizar artículos** y **Inventarios → Abrir inventario** (elegir el de Profit → Abrir).
 3. Sin WiFi: cada persona entra con su usuario y **cuenta** escaneando.
 4. Con WiFi: **Inventarios → Enviar a Profit**. En Profit se revisa y se cierra la toma.
 
@@ -119,6 +123,6 @@ android/
 ```
 
 ## Pruebas
-`cd android && gradlew :core:red:test`: 15 pruebas (conexión, nombres de Profit,
+`cd android && gradlew :core:red:test`: 16 pruebas (conexión, nombres de Profit,
 sincronización, totales del envío, claves compatibles con AppSighecMovil y el ADMIN
 del script SQL). Las pantallas y la base del teléfono se compilan en Android Studio.

@@ -163,7 +163,7 @@ fun PantallaArticulos(
                     label = { Text("Sin inventario") })
                 estado.inventarios.forEach { inv ->
                     FilterChip(selected = estado.inventarioId == inv.id, onClick = { vm.elegirInventario(inv.id) },
-                        label = { Text("Toma ${inv.numero} · Alm. ${inv.coAlma}") })
+                        label = { Text("${inv.numero} · Alm. ${inv.coAlma.ifBlank { "todos" }}") })
                 }
                 if (estado.inventarioId != null) {
                     FilterChip(selected = estado.soloContados, onClick = vm::alternarSoloContados,

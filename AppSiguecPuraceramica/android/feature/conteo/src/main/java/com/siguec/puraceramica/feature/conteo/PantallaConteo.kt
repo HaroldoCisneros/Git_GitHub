@@ -78,7 +78,7 @@ import com.siguec.puraceramica.core.ui.componentes.EscanerCodigo
 import com.siguec.puraceramica.core.ui.componentes.MensajeError
 
 /**
- * Pantalla de contar (una toma física abierta de un almacén), SIN WiFi: todo se
+ * Pantalla de contar (un inventario abierto de un almacén), SIN WiFi: todo se
  * guarda en el teléfono y se envía a Profit desde "Inventarios".
  *  - Botón grande "Escanear": la cámara lee el código de barras y se muestra el
  *    artículo con lo ya contado; se escribe la cantidad y "Anotar".

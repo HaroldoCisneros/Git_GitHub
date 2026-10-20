@@ -5,9 +5,10 @@ package com.siguec.puraceramica.core.red
 import java.math.BigDecimal
 
 /**
- * Las dos operaciones del inventario que necesitan WiFi:
- *   traerAbiertas()  Las tomas físicas abiertas en Profit (para contar en el teléfono).  [contar_inventario]
- *   enviar()         Lo contado en el teléfono -> toma física de Profit.                [cerrar_inventario]
+ * Las operaciones del inventario que necesitan WiFi:
+ *   traerAbiertas()  Los inventarios físicos sin procesar en Profit (saInventarioFisico).  [contar_inventario]
+ *   abrir()          Abre uno en el teléfono: guarda quién y cuándo (tabla aperturas).     [contar_inventario]
+ *   enviar()         Lo contado en el teléfono -> toma física de Profit.                   [cerrar_inventario]
  *
  * El envío va en UNA transacción: auditoría en SIGUEC_PURACERAMICA (envios y
  * envio_conteos) + toma física de Profit. Si algo falla no queda nada a medias.
@@ -21,18 +22,33 @@ class RepositorioInventarioProfit(
     private val acceso: RepositorioAcceso,
     private val tomaFisica: TomaFisicaProfit = TomaFisicaProfit.actual
 ) {
-    /** Las tomas físicas abiertas en Profit. */
+    /** Los inventarios físicos sin procesar en Profit (procesado = 0). */
     suspend fun traerAbiertas(usuario: UsuarioDto, coEmpresa: String): Resultado<List<TomaProfitDto>> =
         bd.usar(coEmpresa) { cx ->
             acceso.exigirPermiso(cx, usuario, coEmpresa, { it.contarInventario }, "Su ambiente no permite contar inventario.")
             tomaFisica.abiertas(cx)
         }
 
-    /** Anota en la bitácora que se trajo una toma al teléfono. */
-    suspend fun anotarTraida(usuario: UsuarioDto, coEmpresa: String, toma: TomaProfitDto): Resultado<Unit> =
-        bd.usar { cx ->
-            cx.anotar(Acciones.TRAER_TOMA, usuario.id, usuario.usuario, coEmpresa,
-                "Toma ${toma.numero}, almacén ${toma.coAlma}", acceso.dispositivo)
+    /**
+     * Abre en el teléfono el inventario elegido: verifica que siga sin procesar en Profit y
+     * guarda en SIGUEC_PURACERAMICA.dbo.aperturas el usuario, el teléfono y la hora (del servidor).
+     */
+    suspend fun abrir(usuario: UsuarioDto, coEmpresa: String, toma: TomaProfitDto): Resultado<AperturaDto> =
+        bd.usar(coEmpresa) { cx ->
+            acceso.exigirPermiso(cx, usuario, coEmpresa, { it.contarInventario }, "Su ambiente no permite contar inventario.")
+            if (!tomaFisica.estaAbierta(cx, toma.numero)) {
+                throw ErrorApp("El inventario ${toma.numero} ya fue procesado (cerrado) en Profit.", TipoError.CONFLICTO)
+            }
+            val fila = cx.consultarUno(
+                """SET NOCOUNT ON; INSERT INTO ${bd.baseApp}.dbo.aperturas (co_empresa, co_invfisico, co_alma, des_invfisico,
+                   usuario, dispositivo, fecha) VALUES (?, ?, ?, ?, ?, ?, GETDATE());
+                   SELECT CONVERT(varchar(19), GETDATE(), 120) AS fecha""",
+                coEmpresa, toma.numero, toma.coAlma.ifEmpty { null }, toma.descripcion.take(60), usuario.usuario,
+                acceso.dispositivo.take(100)
+            )
+            acceso.anotarDesde(cx, Acciones.ABRIR_INVENTARIO, usuario, coEmpresa,
+                "Inventario ${toma.numero}, ${Inventario.almacen(toma.coAlma, toma.desAlma)}")
+            AperturaDto(usuario.usuario, fila?.texto("fecha") ?: Formato.ahora())
         }
 
     /**
@@ -55,7 +71,7 @@ class RepositorioInventarioProfit(
         }
         if (renglones.isEmpty()) throw ErrorApp("No hay nada contado para enviar.")
         if (!tomaFisica.estaAbierta(cx, toma.numero)) {
-            throw ErrorApp("La toma física N° ${toma.numero} ya no está abierta en Profit.", TipoError.CONFLICTO)
+            throw ErrorApp("El inventario ${toma.numero} ya fue procesado (cerrado) en Profit.", TipoError.CONFLICTO)
         }
         val totales = totalesPorArticulo(renglones)
 
@@ -74,7 +90,7 @@ class RepositorioInventarioProfit(
         // 2. Toma física de Profit (Profit se encarga de cerrarla)
         tomaFisica.enviar(cx, toma.numero, totales, usuario.usuarioProfit.ifEmpty { usuario.usuario })
         acceso.anotarDesde(cx, Acciones.ENVIAR_TOMA, usuario, coEmpresa,
-            "Toma ${toma.numero}, almacén ${toma.coAlma}: ${totales.size} artículos, ${renglones.size} conteos")
+            "Inventario ${toma.numero}, almacén ${toma.coAlma}: ${totales.size} artículos, ${renglones.size} conteos")
         ResultadoEnvio(envioId, totales.size, renglones.size)
     }
 

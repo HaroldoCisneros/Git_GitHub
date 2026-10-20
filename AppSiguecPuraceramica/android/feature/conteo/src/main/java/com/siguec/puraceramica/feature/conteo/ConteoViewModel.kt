@@ -38,7 +38,7 @@ data class EstadoConteo(
 )
 
 /**
- * Lógica de contar en UNA toma física abierta, TODO en el teléfono (sin WiFi):
+ * Lógica de contar en UN inventario abierto, TODO en el teléfono (sin WiFi):
  *  1. Se escanea (o escribe) el código de barras -> se muestra el artículo y lo ya contado.
  *  2. Se escribe la cantidad y "Anotar": queda un conteo A NOMBRE de quien cuenta.
  *  Modo rápido: cada escaneo anota 1 unidad y la cámara se vuelve a abrir.

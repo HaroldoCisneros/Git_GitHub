@@ -19,16 +19,16 @@ import kotlinx.coroutines.launch
 data class EstadoInventarios(
     val inventarios: List<InventarioDto> = emptyList(), // Los del teléfono
     val cargando: Boolean = true,
-    val trabajando: Boolean = false,                    // Trayendo o enviando (con WiFi)
+    val trabajando: Boolean = false,                    // Enviando (con WiFi)
     val aviso: String? = null
 )
 
 /**
  * Lógica de "Inventarios":
- *  - Lista: las tomas físicas guardadas en el TELÉFONO (sin WiFi).
- *  - Traer de Profit (WiFi): las tomas físicas ABIERTAS en Profit se guardan en el teléfono.
+ *  - Lista: los inventarios ABIERTOS en el teléfono (sin WiFi). Abrir uno nuevo es
+ *    otra pantalla (PantallaAbrirInventario).
  *  - Enviar a Profit (WiFi): lo contado en el teléfono va a la toma física de Profit
- *    (Profit la cierra) y aquí queda cerrada.
+ *    (Profit la cierra) y aquí queda cerrado.
  *
  * @param gestor sesión: base del teléfono y conexión al SQL Server
  * @param coEmpresa empresa elegida
@@ -52,33 +52,6 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
         }
     }
 
-    /** "Traer de Profit": guarda en el teléfono las tomas físicas abiertas en Profit. */
-    fun traerDeProfit() {
-        val usuario = gestor.usuario ?: return
-        if (_estado.value.trabajando) return
-        _estado.update { it.copy(trabajando = true) }
-        viewModelScope.launch {
-            val repositorio = gestor.inventarioProfit()
-            when (val r = repositorio.traerAbiertas(usuario, coEmpresa)) {
-                is Resultado.Exito -> {
-                    val nuevas = local.guardarTomas(coEmpresa, r.valor)
-                    // La bitácora solo de las que se trajeron ahora
-                    val yaEstaban = _estado.value.inventarios.map { it.numero }.toSet()
-                    r.valor.filter { it.numero !in yaEstaban }.forEach { repositorio.anotarTraida(usuario, coEmpresa, it) }
-                    _estado.update {
-                        it.copy(trabajando = false, aviso = when {
-                            r.valor.isEmpty() -> "No hay tomas físicas abiertas en Profit."
-                            nuevas == 0 -> "Ya tenía todas las tomas abiertas (${r.valor.size})."
-                            else -> "Se trajeron $nuevas tomas físicas abiertas de Profit."
-                        })
-                    }
-                    cargar()
-                }
-                is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
-            }
-        }
-    }
-
     /**
      * "Enviar a Profit": manda TODOS los conteos de este teléfono en esa toma.
      * Si se corta el WiFi a mitad, se puede volver a intentar: no se duplica.
@@ -94,7 +67,7 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
                     local.marcarEnviado(inventario.id, usuario.usuario)
                     if (gestor.ultimoInventario() == inventario.id) gestor.recordarInventario(null)
                     _estado.update {
-                        it.copy(trabajando = false, aviso = "Toma ${inventario.numero} enviada a Profit: " +
+                        it.copy(trabajando = false, aviso = "Inventario ${inventario.numero} enviado a Profit: " +
                             "${r.valor.articulos} artículos, ${r.valor.conteos} conteos. Ciérrela en Profit.")
                     }
                     cargar()

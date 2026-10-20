@@ -20,7 +20,7 @@ data class EstadoElegirInventario(
     val cargando: Boolean = true
 )
 
-/** Las tomas ABIERTAS guardadas en el teléfono (traídas de Profit): solo en esas se cuenta. Sin WiFi. */
+/** Los inventarios ABIERTOS en el teléfono: solo en esos se cuenta. Sin WiFi. */
 class ElegirInventarioViewModel(private val local: InventariosLocales, private val coEmpresa: String) : ViewModel() {
 
     private val _estado = MutableStateFlow(EstadoElegirInventario())

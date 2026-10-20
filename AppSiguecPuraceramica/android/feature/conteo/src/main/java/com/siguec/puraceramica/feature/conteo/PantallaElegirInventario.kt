@@ -53,8 +53,8 @@ import com.siguec.puraceramica.core.ui.componentes.Cargando
 import com.siguec.puraceramica.core.ui.componentes.MensajeVacio
 
 /**
- * "¿En qué inventario va a contar?": las tomas físicas ABIERTAS guardadas en el
- * teléfono (traídas de Profit en "Inventarios"). Si hay una sola se entra directo.
+ * "¿En qué inventario va a contar?": los inventarios ABIERTOS en el
+ * teléfono (abiertos en "Inventarios → Abrir inventario"). Si hay uno solo se entra directo.
  * Funciona sin WiFi.
  *
  * @param ultimo el último en que contó este teléfono (se marca con ✓)
@@ -99,8 +99,8 @@ fun PantallaElegirInventario(
             when {
                 estado.cargando -> Cargando()
                 estado.abiertos.isEmpty() -> MensajeVacio(
-                    "No hay tomas físicas en este teléfono. Vaya a Inventarios y, con el WiFi de la empresa, " +
-                        "toque \"Traer de Profit\".")
+                    "No hay inventarios abiertos en este teléfono. Vaya a Inventarios y, con el WiFi de la " +
+                        "empresa, toque \"Abrir inventario\".")
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(estado.abiertos, key = { it.id }) { inv ->
                         Card(Modifier.fillMaxWidth().clickable { alElegir(inv.id) }) {

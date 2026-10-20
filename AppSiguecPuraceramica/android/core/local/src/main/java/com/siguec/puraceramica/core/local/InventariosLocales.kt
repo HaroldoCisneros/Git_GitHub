@@ -6,6 +6,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 // Modelos y lógica compartida (:core:red)
+import com.siguec.puraceramica.core.red.AperturaDto
 import com.siguec.puraceramica.core.red.ConteoDto
 import com.siguec.puraceramica.core.red.Inventario
 import com.siguec.puraceramica.core.red.InventarioDto
@@ -23,9 +24,9 @@ import kotlinx.coroutines.withContext
 data class Anotacion(val conteo: ConteoDto, val contadoUsuario: String, val contadoTotal: String)
 
 /**
- * Inventarios (tomas físicas traídas de Profit) y conteos, en el TELÉFONO.
+ * Inventarios (abiertos de saInventarioFisico de Profit) y conteos, en el TELÉFONO.
  *
- *   guardarTomas()     Guarda las tomas abiertas traídas de Profit (las que ya estaban, se dejan).
+ *   abrir()            Guarda el inventario elegido con quién lo abrió y cuándo.
  *   lista() / leer()   Inventarios del teléfono con su avance.
  *   anotar()           Un conteo individual (a nombre de quien cuenta).
  *   borrar()           Borra un conteo propio (solo con el inventario abierto).
@@ -36,29 +37,45 @@ class InventariosLocales internal constructor(private val base: BaseLocal) {
 
     private val columnas = """i.id, i.numero, i.co_alma, i.des_alma, i.descripcion, i.fecha, i.abierto, i.enviado_por,
         i.fecha_envio, (SELECT COUNT(DISTINCT co_art) FROM conteos c WHERE c.inventario_id = i.id) AS articulos,
-        (SELECT COUNT(*) FROM conteos c WHERE c.inventario_id = i.id) AS conteos"""
+        (SELECT COUNT(*) FROM conteos c WHERE c.inventario_id = i.id) AS conteos,
+        i.art_cero, i.abierto_por, i.fecha_apertura"""
 
     private fun inventario(c: Cursor) = InventarioDto(
         id = c.getInt(0), numero = c.getString(1), coAlma = c.getString(2), desAlma = c.getString(3),
         descripcion = c.getString(4), fecha = c.getString(5), abierto = c.getInt(6) == 1,
         enviadoPor = c.getString(7).orEmpty(), fechaEnvio = c.getString(8),
-        articulosContados = c.getInt(9), conteos = c.getInt(10)
+        articulosContados = c.getInt(9), conteos = c.getInt(10),
+        artCero = c.getInt(11) == 1, abiertoPor = c.getString(12).orEmpty(), fechaApertura = c.getString(13)
     )
 
-    /** Guarda las tomas traídas de Profit. @return cuántas son nuevas en este teléfono */
-    suspend fun guardarTomas(coEmpresa: String, tomas: List<TomaProfitDto>): Int = withContext(Dispatchers.IO) {
-        val db = base.writableDatabase
-        tomas.count { t ->
+    /** Id del inventario en el teléfono (null = no se ha abierto aquí). */
+    suspend fun buscar(coEmpresa: String, numero: String): InventarioDto? = withContext(Dispatchers.IO) {
+        base.readableDatabase.rawQuery("SELECT $columnas FROM inventarios i WHERE i.co_empresa = ? AND i.numero = ?",
+            arrayOf(coEmpresa, numero)).use { c -> if (c.moveToFirst()) inventario(c) else null }
+    }
+
+    /**
+     * Abre en el teléfono el inventario elegido, con quién lo abrió y cuándo.
+     * Si ya estaba abierto aquí, se deja como está (no se pierden sus conteos).
+     * @return el inventario guardado
+     */
+    suspend fun abrir(coEmpresa: String, toma: TomaProfitDto, apertura: AperturaDto): InventarioDto =
+        withContext(Dispatchers.IO) {
+            val db = base.writableDatabase
             db.insertWithOnConflict("inventarios", null, ContentValues().apply {
                 put("co_empresa", coEmpresa)
-                put("numero", t.numero)
-                put("co_alma", t.coAlma)
-                put("des_alma", t.desAlma)
-                put("descripcion", t.descripcion)
-                put("fecha", t.fecha)
-            }, SQLiteDatabase.CONFLICT_IGNORE) != -1L
+                put("numero", toma.numero)
+                put("co_alma", toma.coAlma)
+                put("des_alma", toma.desAlma)
+                put("descripcion", toma.descripcion)
+                put("fecha", toma.fecha)
+                put("art_cero", if (toma.artCero) 1 else 0)
+                put("abierto_por", apertura.usuario)
+                put("fecha_apertura", apertura.fecha)
+            }, SQLiteDatabase.CONFLICT_IGNORE)
+            db.rawQuery("SELECT $columnas FROM inventarios i WHERE i.co_empresa = ? AND i.numero = ?",
+                arrayOf(coEmpresa, toma.numero)).use { c -> c.moveToFirst(); inventario(c) }
         }
-    }
 
     /** Los inventarios de la empresa en el teléfono (abiertos primero). */
     suspend fun lista(coEmpresa: String, soloAbiertos: Boolean = false): List<InventarioDto> = withContext(Dispatchers.IO) {

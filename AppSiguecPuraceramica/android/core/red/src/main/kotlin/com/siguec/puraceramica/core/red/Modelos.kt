@@ -84,23 +84,30 @@ data class SincronizacionDto(
 
 // ---------------------------- Inventarios (toma física) ----------------------------
 
-/** Una toma física ABIERTA en Profit (se trae al teléfono para contar). */
+/** Un inventario físico SIN PROCESAR en Profit (saInventarioFisico.procesado = 0). */
 data class TomaProfitDto(
-    val numero: String,          // Número de la toma en Profit
-    val coAlma: String,
+    val numero: String,          // co_invfisico
+    val coAlma: String,          // "" = sin almacén
     val desAlma: String = "",
-    val descripcion: String = "",
-    val fecha: String? = null
+    val descripcion: String = "", // des_invfisico
+    val fecha: String? = null,   // inicio ("2026-10-20 08:30")
+    val artCero: Boolean = false // Los artículos no contados quedan en cero al cerrarlo en Profit
 )
 
-/** Un inventario guardado en el teléfono (traído de Profit). */
+/** Lo que devuelve "Abrir": quién y cuándo (hora del servidor). */
+data class AperturaDto(val usuario: String, val fecha: String)
+
+/** Un inventario ABIERTO en el teléfono (traído de saInventarioFisico). */
 data class InventarioDto(
     val id: Int,                 // Número interno del teléfono
-    val numero: String = "",     // Número de la toma física en Profit
+    val numero: String = "",     // co_invfisico de Profit
     val coAlma: String = "",
     val desAlma: String = "",
     val descripcion: String = "",
-    val fecha: String? = null,
+    val fecha: String? = null,   // Inicio en Profit
+    val artCero: Boolean = false,
+    val abiertoPor: String = "", // Usuario que lo abrió en la App
+    val fechaApertura: String? = null,
     val abierto: Boolean = true, // false = ya se envió a Profit (no se puede contar)
     val enviadoPor: String = "",
     val fechaEnvio: String? = null,

@@ -99,9 +99,12 @@ object Inventario {
     /** Texto del stock contado en la consulta: "Contado: 8,5" o "Sin contar". */
     fun contado(texto: String?): String = if (texto == null) "Sin contar" else "Contado: ${Formato.cantidad(texto)}"
 
-    /** "Toma N° 15 · Almacén 01 PRINCIPAL" (el número es el de la toma física de Profit) */
-    fun titulo(i: InventarioDto): String =
-        "Toma N° ${i.numero} · Almacén ${i.coAlma}" + (if (i.desAlma.isNotBlank()) " ${i.desAlma}" else "")
+    /** "Inventario INV-0015 · Almacén 01 PRINCIPAL" (co_invfisico de Profit) */
+    fun titulo(i: InventarioDto): String = "Inventario ${i.numero} · " + almacen(i.coAlma, i.desAlma)
+
+    /** "Almacén 01 PRINCIPAL" ("Todos los almacenes" si el inventario no tiene almacén). */
+    fun almacen(coAlma: String, desAlma: String): String =
+        if (coAlma.isBlank()) "Todos los almacenes" else "Almacén $coAlma" + (if (desAlma.isNotBlank()) " $desAlma" else "")
 }
 
 /** Nombres que ve el administrador. */
@@ -138,7 +141,7 @@ object Administracion {
         "CLAVE_ERRADA" to "Clave errada",
         "BLOQUEO" to "Bloqueado",
         "SINCRONIZAR" to "Sincronizó artículos",
-        "TRAER_TOMA" to "Trajo toma física",
+        "ABRIR_INVENTARIO" to "Abrió inventario",
         "ENVIAR_TOMA" to "Envió conteo a Profit",
         "ADMIN" to "Administración"
     )

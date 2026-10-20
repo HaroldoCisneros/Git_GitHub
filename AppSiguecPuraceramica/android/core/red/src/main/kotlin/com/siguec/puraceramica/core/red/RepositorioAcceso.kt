@@ -15,7 +15,7 @@ object Acciones {
     const val CLAVE_ERRADA = "CLAVE_ERRADA"
     const val BLOQUEO = "BLOQUEO"
     const val SINCRONIZAR = "SINCRONIZAR"        // Bajó los artículos de Profit al teléfono
-    const val TRAER_TOMA = "TRAER_TOMA"          // Trajo una toma física abierta de Profit
+    const val ABRIR_INVENTARIO = "ABRIR_INVENTARIO" // Abrió en el teléfono un inventario físico de Profit
     const val ENVIAR_TOMA = "ENVIAR_TOMA"        // Envió lo contado a la toma física de Profit
     const val ADMIN = "ADMIN"                    // Cambios de usuarios y permisos
 }

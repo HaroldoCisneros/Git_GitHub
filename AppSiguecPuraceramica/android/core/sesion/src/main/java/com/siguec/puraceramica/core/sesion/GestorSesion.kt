@@ -159,7 +159,7 @@ class GestorSesion(contexto: Context) {
     /** Leer los artículos de Profit (sincronizar). */
     fun profit(): RepositorioProfit = bd().let { RepositorioProfit(it, RepositorioAcceso(it, dispositivo)) }
 
-    /** Traer las tomas físicas abiertas y enviar lo contado. */
+    /** Consultar y abrir los inventarios físicos de Profit, y enviar lo contado. */
     fun inventarioProfit(): RepositorioInventarioProfit =
         bd().let { RepositorioInventarioProfit(it, RepositorioAcceso(it, dispositivo)) }
 

@@ -122,7 +122,7 @@ fun PantallaInicio(
                 OpcionMenu(
                     icono = Icons.Filled.QrCodeScanner,
                     titulo = "Contar",
-                    descripcion = "Elegir la toma abierta del almacén y escanear los códigos de barra (sin WiFi)",
+                    descripcion = "Elegir el inventario abierto del almacén y escanear los códigos de barra (sin WiFi)",
                     alTocar = alContar
                 )
             }
@@ -137,12 +137,12 @@ fun PantallaInicio(
                 )
             }
 
-            // ---------- Opción 3: Inventarios (tomas físicas de Profit) ----------
+            // ---------- Opción 3: Inventarios (abrir los de Profit y enviar) ----------
             if (puedeInventarios) {
                 OpcionMenu(
                     icono = Icons.Filled.Warehouse,
                     titulo = "Inventarios",
-                    descripcion = "Traer de Profit las tomas físicas abiertas y, al terminar, enviar lo contado (WiFi)",
+                    descripcion = "Abrir un inventario creado en Profit y, al terminar, enviar lo contado (WiFi)",
                     alTocar = alAbrirInventarios
                 )
             }
