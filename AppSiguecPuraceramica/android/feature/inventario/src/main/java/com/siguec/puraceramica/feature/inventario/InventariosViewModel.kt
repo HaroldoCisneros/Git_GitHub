@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 /** Estado de la pantalla de inventarios. */
 data class EstadoInventarios(
@@ -61,21 +62,30 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
         if (_estado.value.trabajando) return
         _estado.update { it.copy(trabajando = true) }
         viewModelScope.launch {
-            val (renglones, clave) = local.paraEnviar(inventario.id)
-            when (val r = gestor.inventarioProfit().enviar(usuario, coEmpresa, inventario, renglones, clave)) {
-                is Resultado.Exito -> {
-                    local.marcarEnviado(inventario.id, usuario.usuario)
-                    if (gestor.ultimoInventario() == inventario.id) gestor.recordarInventario(null)
-                    _estado.update {
-                        it.copy(trabajando = false, aviso = "Inventario ${inventario.numero} enviado a Profit " +
-                            "(resultado ${r.valor.numResinv}): ${r.valor.articulos} artículos, ${r.valor.conteos} conteos. " +
-                            "Procéselo en Profit.")
+            // Red de seguridad: un error inesperado se muestra como aviso, nunca cierra la App
+            // (lo contado sigue en el teléfono y se puede volver a enviar)
+            try {
+                val (renglones, clave) = local.paraEnviar(inventario.id)
+                when (val r = gestor.inventarioProfit().enviar(usuario, coEmpresa, inventario, renglones, clave)) {
+                    is Resultado.Exito -> {
+                        local.marcarEnviado(inventario.id, usuario.usuario)
+                        if (gestor.ultimoInventario() == inventario.id) gestor.recordarInventario(null)
+                        _estado.update {
+                            it.copy(trabajando = false, aviso = "Inventario ${inventario.numero} enviado a Profit " +
+                                "(resultado ${r.valor.numResinv}): ${r.valor.articulos} artículos, ${r.valor.conteos} conteos. " +
+                                "Procéselo en Profit.")
+                        }
+                        cargar()
+                        // Ya hay conexión: se aprovecha para traer los permisos actuales del usuario
+                        gestor.actualizarSesion()
                     }
-                    cargar()
-                    // Ya hay conexión: se aprovecha para traer los permisos actuales del usuario
-                    gestor.actualizarSesion()
+                    is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
                 }
-                is Resultado.Error -> _estado.update { it.copy(trabajando = false, aviso = r.mensaje) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _estado.update { it.copy(trabajando = false,
+                    aviso = "No se pudo enviar: ${e.message ?: e.javaClass.simpleName}. Lo contado sigue en el teléfono.") }
             }
         }
     }

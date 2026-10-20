@@ -2,7 +2,10 @@
 package com.siguec.puraceramica.core.red
 
 // JDBC (viene con Java; el driver jTDS lo implementa para SQL Server)
+import java.io.IOException
 import java.math.BigDecimal
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
@@ -44,11 +47,15 @@ class BaseDatos(private val config: ConfigConexion) {
     /**
      * Abre una conexión a [base], ejecuta [bloque] en una transacción y la cierra.
      * Las fallas (sin WiFi, clave de SQL, [ErrorApp]...) llegan como [Resultado.Error].
+     * NUNCA lanza una excepción (salvo la cancelación de la pantalla): sin WiFi el driver
+     * lanza errores de red que no son SQLException y, sin atraparlos, cerraban la App.
      */
     suspend fun <T> usar(base: String = baseApp, bloque: (Conexion) -> T): Resultado<T> = withContext(Dispatchers.IO) {
         try {
             ConfigConexion.validarBase(base)?.let { throw ErrorApp(it, TipoError.CONEXION) }
             config.validar()?.let { throw ErrorApp("Revise la configuración de la conexión: $it", TipoError.CONEXION) }
+            // Prueba rápida: ¿responde el servidor? (sin WiFi falla en segundos, sin pasar por el driver)
+            probarServidor()
             Class.forName(DRIVER)
             DriverManager.getConnection(config.urlJdbc(base), config.usuario.trim(), config.clave).use { jdbc ->
                 jdbc.autoCommit = false
@@ -69,8 +76,27 @@ class BaseDatos(private val config: ConfigConexion) {
             traducir(e, base)
         } catch (e: ClassNotFoundException) {
             Resultado.Error("Falta el driver jTDS de SQL Server en la App.", TipoError.SERVIDOR)
+        } catch (e: IOException) {
+            // Sin red, servidor apagado, nombre que no existe, puerto cerrado, tiempo agotado
+            sinConexion()
+        } catch (e: Exception) {
+            // Cualquier otra falla (incluso de red envuelta en otra excepción): mensaje, nunca cerrar la App
+            if (generateSequence<Throwable>(e) { it.cause }.any { it is IOException }) sinConexion()
+            else Resultado.Error("Error inesperado al conectar: ${e.message ?: e.javaClass.simpleName}", TipoError.SERVIDOR)
+        } catch (e: LinkageError) {
+            Resultado.Error("Error del driver de SQL Server: ${e.message ?: e.javaClass.simpleName}", TipoError.SERVIDOR)
         }
     }
+
+    /** Abre y cierra un socket al servidor (solo si hay puerto; con instancia lo resuelve el driver). */
+    private fun probarServidor() {
+        val puerto = config.puerto.trim().toIntOrNull() ?: return
+        Socket().use { it.connect(InetSocketAddress(config.servidor.trim(), puerto), MILISEGUNDOS_PRUEBA) }
+    }
+
+    private fun sinConexion() = Resultado.Error("No se pudo conectar con el servidor ${config.servidor}. " +
+        "¿Está conectado al WiFi de la empresa? Lo contado sigue guardado en el teléfono: envíelo cuando tenga WiFi.",
+        TipoError.SIN_CONEXION)
 
     /** Error de SQL Server -> mensaje claro en español. */
     private fun traducir(e: SQLException, base: String): Resultado.Error {
@@ -79,8 +105,7 @@ class BaseDatos(private val config: ConfigConexion) {
         return when {
             // jTDS: 08S01 = no hubo respuesta (sin red, servidor apagado, puerto cerrado)
             estado.startsWith("08") || codigo == 0 && e.message.orEmpty().contains("Network", ignoreCase = true) ->
-                Resultado.Error("No se pudo conectar con el servidor ${config.servidor}. " +
-                    "¿Está conectado al WiFi de la empresa?", TipoError.SIN_CONEXION)
+                sinConexion()
             codigo == 18456 -> Resultado.Error(
                 "El usuario de SQL Server '${config.usuario}' no existe o su clave no es correcta. El usuario se " +
                     "crea en el servidor con sql/03_permisos_usuario_sql.sql (Paso 1.3 de PASOS_A_SEGUIR).",
@@ -102,6 +127,7 @@ class BaseDatos(private val config: ConfigConexion) {
 
     private companion object {
         const val DRIVER = "net.sourceforge.jtds.jdbc.Driver"
+        const val MILISEGUNDOS_PRUEBA = 4000   // Prueba rápida de que el servidor responde
     }
 }
 

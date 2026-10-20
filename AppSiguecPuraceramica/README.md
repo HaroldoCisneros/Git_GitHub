@@ -173,6 +173,6 @@ android/
 ```
 
 ## Pruebas
-`cd android && gradlew :core:red:test`: 18 pruebas (conexión, nombres de Profit,
+`cd android && gradlew :core:red:test`: 19 pruebas (conexión, nombres de Profit,
 sincronización, totales del envío, claves compatibles con AppSighecMovil y el ADMIN
 del script SQL). Las pantallas y la base del teléfono se compilan en Android Studio.

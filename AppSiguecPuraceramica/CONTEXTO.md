@@ -73,6 +73,10 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     formatos activos el escáner daba números falsos (ITF/Codabar leen pedazos): ahora solo
     Code 39, EAN-13 y Code 128, con autozoom (EscanerCodigo.kt).
 
+16. **Enviar sin WiFi cerraba la App** (reporte del usuario): BaseDatos.usar solo atrapaba
+    SQLException; ahora atrapa cualquier falla (red, driver) y devuelve SIN_CONEXION, con una
+    prueba rápida de socket (4 s) antes del driver. Red de seguridad en InventariosViewModel.enviar.
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
@@ -80,4 +84,4 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 - Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
   (procedimientos de Softech, con pista de auditoría).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
-  :core:red sí se compiló y probó: 18 pruebas OK).
+  :core:red sí se compiló y probó: 19 pruebas OK).

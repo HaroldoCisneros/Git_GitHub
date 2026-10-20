@@ -45,6 +45,14 @@ class ConexionTest {
     }
 
     @Test
+    fun sinServidorNoCierraLaApp() = runTest {
+        // Sin WiFi / servidor apagado: debe volver un error SIN_CONEXION, nunca lanzar una excepción
+        val apagado = ConfigConexion(servidor = "127.0.0.1", puerto = "1", clave = "x", baseProfit = "SAPURA_A")
+        val r = BaseDatos(apagado).usar { "nunca" }
+        assertEquals(TipoError.SIN_CONEXION, (r as Resultado.Error).tipo)
+    }
+
+    @Test
     fun nombresDeProfitDesdeParametros() {
         val cfg = ConfigProfit.desdeParametros(mapOf("profit.columnas_codigo" to "modelo, ref ,cod_barra",
             "profit.tabla_codigos_barra" to "saArtCodBarra"))
