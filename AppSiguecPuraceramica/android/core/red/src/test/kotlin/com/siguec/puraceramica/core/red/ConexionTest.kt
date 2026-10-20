@@ -130,4 +130,13 @@ class ConexionTest {
         assertEquals(true, UsuarioDto(2, "ANA", "Ana", puedeConfigurar = true).autorizaConfiguracion)
         assertEquals(true, UsuarioDto(3, "ADMIN", "Admin", esAdministrador = true).autorizaConfiguracion)
     }
+
+    @Test
+    fun fechasSinApisQueAndroidNoTiene() {
+        // Android no tiene Timestamp.valueOf(LocalDateTime) ni toLocalDateTime(): ida y vuelta por milisegundos
+        val hora = java.time.LocalDateTime.of(2026, 10, 20, 14, 30, 0)
+        val marca = marcaDeTiempo(hora)
+        assertEquals("2026-10-20 14:30:00", textoFecha(marca))
+        assertEquals("2026-10-20 14:30:00", mapOf("f" to marca).fecha("f"))
+    }
 }

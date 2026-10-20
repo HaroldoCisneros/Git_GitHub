@@ -13,7 +13,10 @@ import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Timestamp
 import java.sql.Types
+import java.text.SimpleDateFormat
 import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.Locale
 // Corrutinas: el trabajo con la base va en un hilo aparte (nunca en el de la pantalla)
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -193,7 +196,7 @@ class Conexion internal constructor(private val jdbc: Connection, val base: Stri
             is Long -> st.setLong(posicion, valor)
             is Boolean -> st.setBoolean(posicion, valor)
             is BigDecimal -> st.setBigDecimal(posicion, valor)
-            is LocalDateTime -> st.setTimestamp(posicion, Timestamp.valueOf(valor))
+            is LocalDateTime -> st.setTimestamp(posicion, marcaDeTiempo(valor))
             else -> st.setObject(posicion, valor)
         }
     }
@@ -229,6 +232,16 @@ fun Map<String, Any?>.decimal(columna: String): BigDecimal = when (val v = this[
 }
 
 /** Fecha de SQL Server -> "2026-10-19 14:30:00" (o null). */
-fun Map<String, Any?>.fecha(columna: String): String? = (this[columna] as? java.util.Date)?.let {
-    Timestamp(it.time).toLocalDateTime().withNano(0).toString().replace('T', ' ')
-}
+fun Map<String, Any?>.fecha(columna: String): String? = (this[columna] as? java.util.Date)?.let(::textoFecha)
+
+// OJO ANDROID: su java.sql.Timestamp NO tiene valueOf(LocalDateTime) ni toLocalDateTime()
+// (existen en Java de computadora). Usarlos cerraba el envío en el teléfono con
+// "No static method valueOf(Ljava/time/LocalDateTime;)". Se convierte con milisegundos.
+
+/** LocalDateTime (hora del teléfono) -> Timestamp, sin Timestamp.valueOf(LocalDateTime). */
+internal fun marcaDeTiempo(valor: LocalDateTime): Timestamp =
+    Timestamp(valor.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+
+/** Fecha de JDBC -> "2026-10-19 14:30:00", sin Timestamp.toLocalDateTime(). */
+internal fun textoFecha(fecha: java.util.Date): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(fecha)

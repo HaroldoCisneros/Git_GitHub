@@ -56,7 +56,7 @@ Ejecutar en este orden (carpeta `sql/`):
    (el escáner de códigos de barra es el de Google y no pide permiso de cámara).
 
 > Nota: en la sesión de desarrollo el módulo de conexión (`core/red`) se compiló y
-> pasó sus 19 pruebas, pero las pantallas no se pudieron compilar allí (sin acceso a
+> pasó sus 20 pruebas, pero las pantallas no se pudieron compilar allí (sin acceso a
 > Google Maven). Si Android Studio marca algún error al compilar, envíeme el mensaje.
 
 ## Paso 4. Configurar el teléfono
@@ -138,6 +138,7 @@ guardado); solo va al servidor si el teléfono no lo conoce o si el permiso se l
 |---|---|
 | "El nombre de columna 'puede_configurar' no es válido" / "le falta una columna" | La base se creó con scripts anteriores: ejecute de nuevo **completo** `02_tablas.sql` (F5 sin seleccionar nada; solo agrega lo que falta). |
 | "Usuario o clave incorrectos" la primera vez / no hay usuarios | `07_crear_admin.sql` → ADMIN / cambiar123 (la primera entrada con WiFi). |
+| "Error del driver de SQL Server: No static method valueOf(...LocalDateTime...)" al enviar | Corregido (Android no tiene ese método de fechas). El envío se deshizo completo: vuelva a probar la conexión y enviar. |
 | Al enviar sin WiFi la App se cerraba | Corregido: ahora avisa "No se pudo conectar con el servidor..." y lo contado sigue en el teléfono; envíe cuando tenga WiFi. |
 | Al escanear sale un número que no es el de la etiqueta | Corregido: el escáner solo acepta Code 39, EAN-13 y Code 128. Ponga la etiqueta **horizontal** en la pantalla, que se vea completa (con los `*`), a unos 15–20 cm. |
 | "No se pudo conectar con el servidor..." | WiFi de la empresa, IP/puerto en Configuración, TCP/IP habilitado, firewall. |

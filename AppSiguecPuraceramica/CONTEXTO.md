@@ -81,6 +81,12 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     Profit" está apagado hasta que "Probar conexión" (SELECT 1 en la base de la empresa) sale
     bien; después de cada envío vuelve a "sin probar".
 
+18. **Error real del envío en el teléfono** (captura del usuario): "No static method
+    valueOf(LocalDateTime) in java.sql.Timestamp". Android no tiene Timestamp.valueOf(LocalDateTime)
+    ni toLocalDateTime(): ahora se convierte por milisegundos (marcaDeTiempo / textoFecha en
+    BaseDatos.kt). OJO al usar APIs de java.sql/java.time: las pruebas corren en Java de
+    computadora, que sí las tiene.
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
@@ -88,4 +94,4 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 - Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
   (procedimientos de Softech, con pista de auditoría).
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
-  :core:red sí se compiló y probó: 19 pruebas OK).
+  :core:red sí se compiló y probó: 20 pruebas OK).
