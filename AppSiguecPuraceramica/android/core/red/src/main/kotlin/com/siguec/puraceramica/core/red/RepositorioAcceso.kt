@@ -70,27 +70,41 @@ internal fun Conexion.anotar(accion: String, usuarioId: Int?, usuario: String, c
  */
 class RepositorioAcceso(private val bd: BaseDatos, val dispositivo: String) {
 
-    /** ¿Responde el SQL Server con esta configuración? Devuelve el nombre de la base y la versión. */
-    suspend fun probar(): Resultado<String> = bd.usar { cx ->
-        val f = cx.consultarUno("SELECT DB_NAME() AS base, CAST(SERVERPROPERTY('ProductVersion') AS varchar(30)) AS version")
-        "Conexión correcta: base ${f?.texto("base")}, SQL Server ${f?.texto("version")}"
+    /**
+     * "Probar conexión" y "Guardar" en Configuración: entra a la base de la App, revisa que la
+     * base de Profit exista, que el usuario de SQL tenga acceso y que sea una empresa de Profit.
+     * Si la empresa no está registrada en la App, la registra y se la da a los administradores
+     * con todos los permisos (así no hay que hacerlo a mano en SQL).
+     */
+    suspend fun probar(baseProfit: String): Resultado<String> = bd.usar { cx ->
+        val base = baseProfit.trim().uppercase()
+        val f = cx.consultarUno("SELECT CAST(SERVERPROPERTY('ProductVersion') AS varchar(30)) AS version, " +
+            "DB_ID(?) AS id, HAS_DBACCESS(?) AS acceso", base, base)
+        if (f?.get("id") == null) throw ErrorApp("La base de Profit $base no existe en el servidor.", TipoError.NO_ENCONTRADO)
+        if (f.entero("acceso") != 1) {
+            throw ErrorApp("El usuario de SQL no tiene acceso a la base $base: ejecute sql/03_permisos_usuario_sql.sql " +
+                "con USE $base.", TipoError.PERMISO)
+        }
+        if (cx.consultarUno("SELECT OBJECT_ID(?) AS id", "$base.dbo.saArticulo")?.get("id") == null) {
+            throw ErrorApp("La base $base no es una empresa de Profit 2K12 (no tiene saArticulo) o el usuario de SQL " +
+                "no tiene permiso de leerla (sql/03).", TipoError.NO_ENCONTRADO)
+        }
+        // Empresa y permisos de los administradores en la App (solo si faltan)
+        val nueva = cx.consultarUno("SELECT 1 AS hay FROM dbo.empresas WHERE co_empresa = ?", base) == null
+        if (nueva) cx.ejecutar("INSERT INTO dbo.empresas (co_empresa, nombre) VALUES (?, ?)", base, base)
+        cx.ejecutar(SQL_AMBIENTE_ADMINISTRADORES, base, base)
+        "Conexión correcta (SQL Server ${f.texto("version")}): base de la App ${bd.baseApp} y empresa de Profit $base" +
+            if (nueva) ". Empresa $base registrada en la App para los administradores." else "."
     }
 
     /**
-     * Monedas de Profit (saMoneda: co_mone, mone_des, cambio) para elegir en Configuración.
-     * Se leen de las bases de las empresas activas de la App (sin repetir el código).
+     * Monedas de Profit (saMoneda: co_mone, mone_des, cambio) de la base de Profit de
+     * Configuración, para elegir la del resultado de inventario.
      */
-    suspend fun monedas(): Resultado<List<MonedaDto>> = bd.usar { cx ->
-        val bases = cx.consultar("SELECT co_empresa FROM dbo.empresas WHERE activa = 1 ORDER BY co_empresa")
-            .map { it.texto("co_empresa") }
-            .filter { ConfigConexion.validarBase(it) == null }   // Va dentro del SQL
-            .filter { cx.consultarUno("SELECT OBJECT_ID(?) AS id", "$it.dbo.saMoneda")?.get("id") != null }
-        if (bases.isEmpty()) throw ErrorApp("No se encontró la tabla saMoneda en las empresas de la App.", TipoError.NO_ENCONTRADO)
-        bases.flatMap { base ->
-            cx.consultar("SELECT RTRIM(co_mone) AS co_mone, RTRIM(mone_des) AS mone_des, cambio " +
-                "FROM [$base].dbo.saMoneda ORDER BY co_mone")
-                .map { MonedaDto(it.texto("co_mone"), it.texto("mone_des"), it.decimal("cambio").stripTrailingZeros().toPlainString()) }
-        }.distinctBy { it.coMone.uppercase() }
+    suspend fun monedas(baseProfit: String): Resultado<List<MonedaDto>> = bd.usar(baseProfit.trim()) { cx ->
+        cx.consultar("SELECT RTRIM(co_mone) AS co_mone, RTRIM(mone_des) AS mone_des, cambio FROM dbo.saMoneda ORDER BY co_mone")
+            .map { MonedaDto(it.texto("co_mone"), it.texto("mone_des"), it.decimal("cambio").stripTrailingZeros().toPlainString()) }
+            .ifEmpty { throw ErrorApp("La tabla saMoneda de ${baseProfit.trim()} no tiene monedas.", TipoError.NO_ENCONTRADO) }
     }
 
     /**
@@ -184,6 +198,12 @@ class RepositorioAcceso(private val bd: BaseDatos, val dispositivo: String) {
     }
 
     private companion object {
+        // Los administradores reciben la empresa con todos los permisos (solo los que no la tienen)
+        const val SQL_AMBIENTE_ADMINISTRADORES = """INSERT INTO dbo.ambientes (usuario_id, co_empresa,
+            puede_consultar_articulos, puede_sincronizar_articulos, puede_contar_inventario, puede_cerrar_inventario)
+            SELECT u.id, ?, 1, 1, 1, 1 FROM dbo.usuarios u WHERE u.es_administrador = 1
+              AND NOT EXISTS (SELECT 1 FROM dbo.ambientes a WHERE a.usuario_id = u.id AND a.co_empresa = ?)"""
+
         // Hash de relleno: si el usuario no existe se calcula igual un PBKDF2 (misma demora)
         val HASH_RELLENO: String by lazy { Seguridad.cifrarClave("relleno-sin-uso") }
     }

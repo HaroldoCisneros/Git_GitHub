@@ -77,11 +77,11 @@ class GestorSesion(contexto: Context) {
 
     /** Prueba una configuración (sin guardarla). */
     suspend fun probarConexion(config: ConfigConexion): Resultado<String> =
-        RepositorioAcceso(BaseDatos(config), dispositivo).probar()
+        RepositorioAcceso(BaseDatos(config), dispositivo).probar(config.baseProfit)
 
     /** Monedas de Profit para elegir en Configuración (con lo escrito, sin guardarlo). */
     suspend fun monedas(config: ConfigConexion): Resultado<List<MonedaDto>> =
-        RepositorioAcceso(BaseDatos(config), dispositivo).monedas()
+        RepositorioAcceso(BaseDatos(config), dispositivo).monedas(config.baseProfit)
 
     private fun bd() = BaseDatos(almacen.conexion)
     private fun acceso() = RepositorioAcceso(bd(), dispositivo)
@@ -133,9 +133,10 @@ class GestorSesion(contexto: Context) {
         almacen.sesion = sesion
         almacen.ultimoUsuario = sesion.usuario.usuario
         _sesion.value = sesion
-        // La empresa de la vez anterior, si todavía la tiene; o la única que tiene
+        // La empresa de Profit de Configuración; si no la tiene, la de la vez anterior o la única que tiene
+        val configurada = sesion.ambientes.firstOrNull { it.coEmpresa.equals(almacen.conexion.baseProfit.trim(), ignoreCase = true) }
         val anterior = sesion.ambientes.firstOrNull { it.coEmpresa == almacen.empresa }
-        _ambiente.value = anterior ?: sesion.ambientes.singleOrNull()
+        _ambiente.value = configurada ?: anterior ?: sesion.ambientes.singleOrNull()
     }
 
     /** Empresa con la que se va a trabajar. */

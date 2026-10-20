@@ -43,9 +43,12 @@ misma **clave de envío** y SQL Server no lo recibe dos veces.
 
 ## Configuración (botón en la entrada y en el menú)
 
-Servidor (IP o nombre), puerto (1433) o instancia, usuario y clave de SQL Server,
-base de la App y **moneda del resultado de inventario** (se elige una vez de `saMoneda`
-de Profit con "Buscar monedas en Profit"; la tasa es su `cambio` al enviar). "Probar conexión" verifica sin guardar. La clave de SQL guardada
+Servidor (IP o nombre), puerto (1433) o instancia, usuario y clave de SQL Server
+(los crea `sql/03`), base de la App, **base de datos de Profit** (la empresa, ej. `SAPURA_A`) y **moneda del resultado de inventario** (se elige una vez de `saMoneda`
+de Profit con "Buscar monedas en Profit"; la tasa es su `cambio` al enviar).
+"Probar conexión" verifica las dos bases sin guardar; "Guardar" verifica y guarda. La
+primera vez registra la empresa en la App y se la da a los administradores (no hay que
+hacerlo a mano en SQL). La clave de SQL guardada
 **nunca se muestra** (solo se puede escribir una nueva).
 
 **Seguridad de la conexión directa** (decisión tomada): la clave del usuario de SQL
@@ -113,11 +116,11 @@ cuentan el mismo inventario, cada uno envía **su propio resultado**.
 
 1. **SQL Server Management Studio**: `sql/01_crear_base.sql`, `sql/02_tablas.sql`
    (crea el usuario **ADMIN / cambiar123**: cámbiele la clave al entrar),
-   `sql/03_permisos_usuario_sql.sql` (cambie la clave), y para revisar los nombres
-   `sql/04_consultas_verificacion.sql`.
-2. Registrar la empresa: `INSERT INTO SIGUEC_PURACERAMICA.dbo.empresas (co_empresa, nombre) VALUES ('PURACERAMICA', 'Pura Cerámica')`.
-3. **Android Studio**: abrir `android/` y compilar. En el teléfono: Configuración →
-   datos del SQL Server → Probar conexión → Guardar. Entrar con ADMIN y crear los
+   `sql/03_permisos_usuario_sql.sql` (**crea el usuario de SQL `siguec_puraceramica`**; cambie
+   la clave), y para revisar los nombres `sql/04_consultas_verificacion.sql`.
+2. **Android Studio**: abrir `android/` y compilar. En el teléfono: Configuración →
+   datos del SQL Server y base de Profit (ej. `SAPURA_A`) → Probar conexión → moneda →
+   Guardar (registra la empresa en la App para el ADMIN). Entrar con ADMIN y crear los
    usuarios (Usuarios y permisos).
 
 ## Uso típico

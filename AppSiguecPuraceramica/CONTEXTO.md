@@ -52,6 +52,11 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     saMoneda de Profit: co_mone, mone_des, cambio) y la tasa del resultado es saMoneda.cambio
     al enviar. Se quitaron profit.co_mone / profit.tasa.
 
+13. **Base de Profit en Configuración** (pedido del usuario): se escribe la base de la empresa
+    (ej. SAPURA_A). Probar/Guardar revisan las dos bases y registran la empresa en la App con
+    los administradores (empresas + ambientes) si falta; al entrar se usa esa empresa.
+    El usuario de SQL `siguec_puraceramica` lo crea sql/03 (el mensaje de error lo dice).
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).

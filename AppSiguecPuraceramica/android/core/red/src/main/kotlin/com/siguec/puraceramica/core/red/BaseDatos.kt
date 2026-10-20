@@ -82,8 +82,11 @@ class BaseDatos(private val config: ConfigConexion) {
                 Resultado.Error("No se pudo conectar con el servidor ${config.servidor}. " +
                     "¿Está conectado al WiFi de la empresa?", TipoError.SIN_CONEXION)
             codigo == 18456 -> Resultado.Error(
-                "El usuario o la clave de SQL Server no son correctos. Revise Configuración.", TipoError.CONEXION)
-            codigo == 4060 -> Resultado.Error("No se pudo abrir la base $base en el servidor.", TipoError.CONEXION)
+                "El usuario de SQL Server '${config.usuario}' no existe o su clave no es correcta. El usuario se " +
+                    "crea en el servidor con sql/03_permisos_usuario_sql.sql (Paso 1.3 de PASOS_A_SEGUIR).",
+                TipoError.CONEXION)
+            codigo == 4060 -> Resultado.Error("No se pudo abrir la base $base: no existe en el servidor o el " +
+                "usuario de SQL '${config.usuario}' no tiene acceso (sql/03_permisos_usuario_sql.sql).", TipoError.CONEXION)
             codigo == 229 || codigo == 230 -> Resultado.Error(
                 "El usuario de SQL Server no tiene permiso para esta operación (ver sql/03_permisos_usuario_sql.sql).",
                 TipoError.PERMISO)

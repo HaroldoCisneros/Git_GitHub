@@ -13,11 +13,12 @@ Ejecutar en este orden (carpeta `sql/`):
 1. **`01_crear_base.sql`** — crea la base propia `SIGUEC_PURACERAMICA`.
 2. **`02_tablas.sql`** — crea las tablas (usuarios, permisos, bitácora, aperturas,
    envíos) y el primer usuario **ADMIN** con clave **`cambiar123`**.
-3. **`03_permisos_usuario_sql.sql`** — ANTES de ejecutarlo:
+3. **`03_permisos_usuario_sql.sql`** — **crea el usuario de SQL Server `siguec_puraceramica`**
+   (el que se escribe en Configuración del teléfono; NO existe hasta ejecutar este script).
+   ANTES de ejecutarlo:
    - cambie `CAMBIAR_ESTA_CLAVE` por una clave segura (se escribirá en los teléfonos);
-   - cambie `USE PURACERAMICA;` por el **nombre real de la base de la empresa**
-     (en sus scripts aparece `SAPURA_A`).
-   Crea el usuario de SQL `siguec_puraceramica` con lo mínimo: su base, solo lectura en
+   - si la base de la empresa no se llama `SAPURA_A`, cambie `USE SAPURA_A;` por el nombre real.
+   Le da lo mínimo: su base, solo lectura en
    `saArticulo`, `saInventarioFisico`, `saAlmacen`, `saArtUnidad` y `saStockAlmacen`, e
    INSERT en `saResInventario` y `saResInventarioReng` (el resultado de lo contado), y
    EXECUTE en los procedimientos de Profit `pInsertarResInventario` y
@@ -25,19 +26,9 @@ Ejecutar en este orden (carpeta `sql/`):
    (correlativo del resultado; si no existe, ejecute antes `06_procedimiento_proximo_numero.sql`)
    y en la función `ConsultarUltimoCosto` (costo unitario de cada renglón; si su base
    no la tiene, ejecute antes `05_funcion_ultimo_costo.sql`).
-4. **Registrar la empresa** (use el nombre real de la base):
-   ```sql
-   INSERT INTO SIGUEC_PURACERAMICA.dbo.empresas (co_empresa, nombre)
-   VALUES ('SAPURA_A', 'Pura Cerámica');
-   ```
-5. **Darle la empresa al ADMIN** (permisos de todo):
-   ```sql
-   INSERT INTO SIGUEC_PURACERAMICA.dbo.ambientes
-     (usuario_id, co_empresa, almacen, puede_consultar_articulos, puede_sincronizar_articulos,
-      puede_contar_inventario, puede_cerrar_inventario)
-   SELECT id, 'SAPURA_A', NULL, 1, 1, 1, 1 FROM SIGUEC_PURACERAMICA.dbo.usuarios WHERE usuario = 'ADMIN';
-   ```
-6. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
+   (Registrar la empresa y dársela al ADMIN ya NO se hace a mano: lo hace la App al
+   guardar la Configuración del teléfono, Paso 4.)
+4. (Opcional) `04_consultas_verificacion.sql` — solo consulta; sirve para revisar
    los nombres de las tablas de Profit.
 
 > Si ya había ejecutado los scripts antes, vuelva a ejecutar `02_tablas.sql` y
@@ -70,9 +61,10 @@ Ejecutar en este orden (carpeta `sql/`):
 
 1. Abra la App → botón **Configuración** (arriba a la derecha o abajo en la entrada).
 2. Escriba: **Servidor** (IP del SQL Server), **Puerto** `1433` (o la **Instancia**),
-   **Usuario** `siguec_puraceramica`, la **Clave** del Paso 1.3 y **Base de la App**
-   `SIGUEC_PURACERAMICA`.
-3. **Probar conexión** → debe decir "Conexión correcta".
+   **Usuario** `siguec_puraceramica` y su **Clave** (los crea el Paso 1.3), **Base de la App**
+   `SIGUEC_PURACERAMICA` y **Base de datos de Profit** (la de la empresa, ej. `SAPURA_A`).
+3. **Probar conexión** → revisa las dos bases y debe decir "Conexión correcta". La primera
+   vez también registra la empresa en la App y se la da al ADMIN con todos los permisos.
 4. **Moneda del resultado de inventario** → **Buscar monedas en Profit** (lista `saMoneda`)
    → toque la moneda (ej. Bolívares). Se hace una sola vez. Luego **Guardar**.
    Al enviar, la tasa se toma del **cambio** de esa moneda en Profit en ese momento.

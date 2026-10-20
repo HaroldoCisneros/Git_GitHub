@@ -53,9 +53,10 @@ import com.siguec.puraceramica.core.ui.tema.ColoresMarca
  *  - Servidor: IP o nombre del equipo (ej. 192.168.1.10).
  *  - Puerto (1433) o instancia (ej. SQLEXPRESS).
  *  - Usuario y clave de SQL Server de la App (sql/03_permisos_usuario_sql.sql).
- *  - Base de la App (SIGUEC_PURACERAMICA).
+ *  - Base de la App (SIGUEC_PURACERAMICA) y base de Profit de la empresa (ej. SAPURA_A).
  *  - Moneda del resultado de inventario (se elige de saMoneda de Profit; la tasa es su cambio).
- * "Probar conexión" se conecta con lo escrito sin guardarlo.
+ * "Probar conexión" se conecta con lo escrito sin guardarlo; "Guardar" verifica y luego guarda
+ * (si la empresa no está registrada en la App, la registra para los administradores).
  */
 @Composable
 fun PantallaConfiguracion(gestor: GestorSesion, alVolver: () -> Unit) {
@@ -87,17 +88,28 @@ fun PantallaConfiguracion(gestor: GestorSesion, alVolver: () -> Unit) {
                     modifier = Modifier.weight(1f))
             }
             OutlinedTextField(estado.usuario, vm::alCambiarUsuario, label = { Text("Usuario de SQL Server") },
-                singleLine = true, modifier = Modifier.fillMaxWidth())
+                singleLine = true, modifier = Modifier.fillMaxWidth(),
+                supportingText = { Text("Se crea en el servidor con sql/03_permisos_usuario_sql.sql (Paso 1.3)") })
             // La clave guardada nunca se muestra: vacío = se deja la que está
             OutlinedTextField(estado.claveNueva, vm::alCambiarClave, label = { Text("Clave de SQL Server") },
                 placeholder = { Text(if (estado.tieneClave) "•••••• (déjela vacía para no cambiarla)" else "") },
                 singleLine = true, visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(estado.baseApp, vm::alCambiarBase, label = { Text("Base de la App") },
+            OutlinedTextField(estado.baseApp, vm::alCambiarBase, label = { Text("Base de la App (usuarios y permisos)") },
                 singleLine = true, keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 modifier = Modifier.fillMaxWidth())
+            // Base de la empresa en Profit: artículos, inventarios, monedas y resultado
+            OutlinedTextField(estado.baseProfit, vm::alCambiarBaseProfit, label = { Text("Base de datos de Profit (empresa)") },
+                placeholder = { Text("SAPURA_A") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                modifier = Modifier.fillMaxWidth())
 
-            // ---------- Moneda del resultado de inventario ----------
+            OutlinedButton(onClick = vm::probar, enabled = !estado.probando, modifier = Modifier.fillMaxWidth()) {
+                if (estado.probando) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                else Text("Probar conexión")
+            }
+
+            // ---------- Moneda del resultado de inventario (de la base de Profit) ----------
             HorizontalDivider()
             Text("Moneda del resultado de inventario", style = MaterialTheme.typography.titleSmall)
             Text(if (estado.coMone.isEmpty()) "Sin elegir: búsquela en Profit y elija una (se hace una sola vez)."
@@ -122,10 +134,6 @@ fun PantallaConfiguracion(gestor: GestorSesion, alVolver: () -> Unit) {
             estado.mensajeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             estado.mensajeAviso?.let { Text(it, color = ColoresMarca.Verde) }
 
-            OutlinedButton(onClick = vm::probar, enabled = !estado.probando, modifier = Modifier.fillMaxWidth()) {
-                if (estado.probando) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Text("Probar conexión")
-            }
             Button(onClick = vm::guardar, enabled = !estado.probando, modifier = Modifier.fillMaxWidth().height(50.dp)) {
                 Text("Guardar")
             }

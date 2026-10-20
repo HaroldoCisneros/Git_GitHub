@@ -28,7 +28,9 @@ class ConexionTest {
 
     @Test
     fun validarConfiguracion() {
-        assertNull(ConfigConexion(servidor = "192.168.1.10").validar())
+        assertNull(ConfigConexion(servidor = "192.168.1.10", baseProfit = "SAPURA_A").validar())
+        assertNotNull(ConfigConexion(servidor = "192.168.1.10").validar())               // Falta la base de Profit
+        assertNotNull(ConfigConexion(servidor = "x", baseProfit = "SAPURA_A]; DROP").validar())
         assertNotNull(ConfigConexion(servidor = "").validar())
         assertNotNull(ConfigConexion(servidor = "a;b").validar())
         assertNotNull(ConfigConexion(servidor = "x", puerto = "abc").validar())
@@ -92,8 +94,8 @@ class ConexionTest {
         assertNotNull(ConfigProfit(prefijoResultado = "AP P").validar())
         assertNotNull(ConfigProfit(procedimientoNumero = "p; DROP TABLE x").validar())
         // Moneda: se elige en Configuración del teléfono (la tasa es saMoneda.cambio)
-        assertNull(ConfigConexion(servidor = "S", coMone = "BS").validar())
-        assertNotNull(ConfigConexion(servidor = "S", coMone = "B'S").validar())
+        assertNull(ConfigConexion(servidor = "S", baseProfit = "SAPURA_A", coMone = "BS").validar())
+        assertNotNull(ConfigConexion(servidor = "S", baseProfit = "SAPURA_A", coMone = "B'S").validar())
         // Costo unitario: función de la empresa (nombre validado porque va dentro del SQL)
         assertEquals("ConsultarUltimoCosto", ConfigProfit().funcionCosto)
         assertNotNull(ConfigProfit(funcionCosto = "x(); DROP TABLE y").validar())

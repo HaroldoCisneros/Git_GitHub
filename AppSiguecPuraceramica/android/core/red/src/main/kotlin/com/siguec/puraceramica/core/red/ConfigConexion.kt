@@ -11,9 +11,11 @@ import kotlinx.serialization.Serializable
  * @property servidor IP o nombre del equipo del SQL Server (ej. 192.168.1.10 o APPSRV)
  * @property puerto puerto TCP (1433 normalmente); vacío = lo busca por la [instancia]
  * @property instancia instancia con nombre (ej. SQLEXPRESS); vacío = la predeterminada
- * @property usuario usuario de SQL Server de la App (siguec_puraceramica, ver sql/03)
+ * @property usuario usuario de SQL Server de la App (siguec_puraceramica: lo crea sql/03)
  * @property clave su clave (se guarda solo en este teléfono, nunca se muestra)
  * @property baseApp base propia de la App con usuarios y permisos
+ * @property baseProfit base de la empresa en Profit 2K12 (ej. SAPURA_A): artículos, inventarios,
+ *           monedas y resultado de inventario
  * @property coMone moneda del resultado de inventario (saMoneda de Profit). Se elige una vez en
  *           Configuración; la tasa se lee de saMoneda.cambio al enviar
  */
@@ -25,10 +27,12 @@ data class ConfigConexion(
     val usuario: String = "siguec_puraceramica",
     val clave: String = "",
     val baseApp: String = "SIGUEC_PURACERAMICA",
+    val baseProfit: String = "",
     val coMone: String = ""
 ) {
     /** ¿Están los datos mínimos? */
-    val completa: Boolean get() = servidor.isNotBlank() && usuario.isNotBlank() && validarBase(baseApp) == null
+    val completa: Boolean get() = servidor.isNotBlank() && usuario.isNotBlank() && validarBase(baseApp) == null &&
+        validarBase(baseProfit) == null
 
     /**
      * Dirección JDBC de jTDS para una base. Ejemplo:
@@ -55,7 +59,8 @@ data class ConfigConexion(
         instancia.any { it == ';' } -> "La instancia no es válida"
         usuario.isBlank() -> "Escriba el usuario de SQL Server"
         coMone.isNotEmpty() && !Regex("^[A-Za-z0-9$]{1,6}$").matches(coMone) -> "Código de moneda no válido: '$coMone'"
-        else -> validarBase(baseApp)
+        baseProfit.isBlank() -> "Escriba la base de datos de Profit (la de la empresa, ej. SAPURA_A)"
+        else -> validarBase(baseApp) ?: validarBase(baseProfit)
     }
 
     companion object {
