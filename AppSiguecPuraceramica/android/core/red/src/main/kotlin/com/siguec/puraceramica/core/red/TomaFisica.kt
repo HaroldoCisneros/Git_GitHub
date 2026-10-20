@@ -162,20 +162,17 @@ object TomaFisica2K12 : TomaFisicaProfit {
     }
 
     /**
-     * La unidad principal de cada artículo (saArtUnidad). Si la tabla tiene una columna que marca
-     * la principal (uni_principal) se usa; si no, la de equivalencia 1; si no, la primera.
+     * La unidad principal de cada artículo (saArtUnidad, confirmado con el script de la base):
+     * uni_principal = 1 ("Unidad principal base"). Si algún artículo no la tuviera marcada, se toma
+     * la de equivalencia 1 y, si no, la primera.
      */
     private fun unidadPrincipal(cx: Conexion, codigos: List<String>): Map<String, String> {
-        val columnas = columnas(cx, "saArtUnidad")
-        val orden = listOfNotNull(
-            "CASE WHEN [uni_principal] = 1 THEN 0 ELSE 1 END".takeIf { "uni_principal" in columnas },
-            "CASE WHEN [equivalencia] = 1 THEN 0 ELSE 1 END".takeIf { "equivalencia" in columnas },
-            "co_uni"
-        ).joinToString(", ")
         val unidades = mutableMapOf<String, String>()
         codigos.chunked(LOTE).forEach { lote ->
             cx.consultar("SELECT RTRIM(co_art) AS co_art, RTRIM(co_uni) AS co_uni FROM dbo.saArtUnidad " +
-                "WHERE co_art IN (${lote.joinToString(",") { "?" }}) ORDER BY co_art, $orden", *lote.toTypedArray())
+                "WHERE co_art IN (${lote.joinToString(",") { "?" }}) " +
+                "ORDER BY co_art, CASE WHEN uni_principal = 1 THEN 0 ELSE 1 END, " +
+                "CASE WHEN equivalencia = 1 THEN 0 ELSE 1 END, co_uni", *lote.toTypedArray())
                 .forEach { f -> unidades.putIfAbsent(f.texto("co_art"), f.texto("co_uni")) }
         }
         return unidades

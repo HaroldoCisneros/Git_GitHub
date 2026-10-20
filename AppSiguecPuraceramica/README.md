@@ -95,7 +95,7 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 | `co_mone`, `tasa` | Parámetro `profit.co_mone` (si no está, la del último resultado grabado en Profit) y `profit.tasa` (1) |
 | `co_us_in/mo`, `co_sucu_in/mo` | Usuario y sucursal del **registro del inventario** en `saInventarioFisico` |
 | `saResInventarioReng.reng_num` | 1, 2, 3... (un renglón por artículo) |
-| `co_uni` | Unidad principal del artículo en `saArtUnidad` |
+| `co_uni` | Unidad principal del artículo: `saArtUnidad.uni_principal = 1` |
 | `total_art` | Stock contado (suma de los conteos del teléfono) |
 | `total_art_teo` | Existencia actual en el almacén (`saStockAlmacen`, tipo `ACT`; 0 si no se puede leer) |
 | `cost_unit` | `dbo.ConsultarUltimoCosto(saArticulo.rowguid)`: último costo de entrada (sin REPO ni PROV) |

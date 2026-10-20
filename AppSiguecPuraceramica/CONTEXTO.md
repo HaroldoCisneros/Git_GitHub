@@ -39,15 +39,15 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     abrir, en el teléfono y en aperturas). num_resinv = correlativo de Profit con
     dbo.psObtenerProximoNumero (sql/06), dentro de la transacción del envío. Cada teléfono
     = un resultado (uso normal: UN teléfono por almacén/inventario abierto; el usuario aceptó
-    dejar así el caso de varios). co_uni = unidad principal de saArtUnidad; total_art_teo de
+    dejar así el caso de varios). co_uni = unidad principal de saArtUnidad
+    (uni_principal = 1, CONFIRMADO con el script de la tabla); total_art_teo de
     saStockAlmacen; cost_unit = dbo.ConsultarUltimoCosto(saArticulo.rowguid) (función de la
     empresa, sql/05; parámetro profit.funcion_costo).
 
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
-- `saArtUnidad`: columna que marca la unidad principal (se usa uni_principal o equivalencia = 1
-  si existen). `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
+- `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
 - Moneda del resultado (`profit.co_mone`).
 - Encabezado con pInsertarResInventario y renglones con pInsertarRenglonesResInventario
   (procedimientos de Softech, con pista de auditoría).

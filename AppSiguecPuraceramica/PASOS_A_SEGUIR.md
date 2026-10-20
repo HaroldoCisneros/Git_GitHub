@@ -110,7 +110,7 @@ Ejecutar en este orden (carpeta `sql/`):
 
 - Que Profit **sume varios resultados** del mismo inventario al procesarlo (cada teléfono
   envía el suyo). Pruebe primero con dos teléfonos y pocos artículos.
-- La **unidad** de cada renglón sale de `saArtUnidad` (la principal): revise en Profit que
+- La **unidad** de cada renglón sale de `saArtUnidad` (`uni_principal = 1`): revise en Profit que
   el resultado se vea bien antes de procesarlo.
 
 ## Si algo falla
