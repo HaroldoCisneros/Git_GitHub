@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.QrCodeScanner
+import com.siguec.puraceramica.core.ui.tema.ColoresMarca
+import androidx.compose.material.icons.filled.Wifi
 // Componentes de Material 3
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -126,8 +128,16 @@ fun PantallaInventarios(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Prueba de conexión: solo si hay algo para enviar
+                    if (puedeEnviar && estado.inventarios.any { it.abierto && it.conteos > 0 }) {
+                        item(key = "conexion") {
+                            TarjetaConexion(estado.conexion, estado.mensajeConexion, trabajando = estado.trabajando,
+                                alProbar = vm::probarConexion)
+                        }
+                    }
                     items(estado.inventarios, key = { it.id }) { inv ->
-                        TarjetaInventario(inv, puedeEnviar, trabajando = estado.trabajando,
+                        TarjetaInventario(inv, puedeEnviar, conexionLista = estado.conexion == PruebaConexion.LISTA,
+                            trabajando = estado.trabajando,
                             alContar = { alContar(inv.id) }, alEnviar = { enviando = inv }, alQuitar = { quitando = inv })
                     }
                 }
@@ -144,7 +154,10 @@ fun PantallaInventarios(
                     "conteos de este teléfono (${inv.articulosContados} artículos). Después ya no se podrá contar " +
                     "aquí; el inventario se cierra en Profit.")
             },
-            confirmButton = { TextButton(onClick = { enviando = null; vm.enviar(inv) }) { Text("Enviar") } },
+            confirmButton = {
+                TextButton(onClick = { enviando = null; vm.enviar(inv) },
+                    enabled = estado.conexion == PruebaConexion.LISTA) { Text("Enviar") }
+            },
             dismissButton = { TextButton(onClick = { enviando = null }) { Text("Cancelar") } }
         )
     }
@@ -159,12 +172,41 @@ fun PantallaInventarios(
     }
 }
 
+/**
+ * Prueba de conexión antes de enviar. "Enviar a Profit" queda APAGADO hasta que la prueba
+ * salga bien; después de cada envío hay que probar otra vez.
+ */
+@Composable
+private fun TarjetaConexion(prueba: PruebaConexion, mensaje: String?, trabajando: Boolean, alProbar: () -> Unit) {
+    val (texto, color) = when (prueba) {
+        PruebaConexion.SIN_PROBAR -> "Para enviar a Profit, primero pruebe la conexión (WiFi de la empresa)." to
+            MaterialTheme.colorScheme.onSurfaceVariant
+        PruebaConexion.PROBANDO -> "Probando la conexión con el servidor..." to MaterialTheme.colorScheme.onSurfaceVariant
+        PruebaConexion.LISTA -> "Conexión lista: ya puede enviar." to ColoresMarca.Verde
+        PruebaConexion.FALLO -> (mensaje ?: "Sin conexión con el servidor.") to MaterialTheme.colorScheme.error
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(texto, style = MaterialTheme.typography.bodyMedium, color = color)
+            OutlinedButton(onClick = alProbar, enabled = !trabajando && prueba != PruebaConexion.PROBANDO) {
+                if (prueba == PruebaConexion.PROBANDO) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Filled.Wifi, contentDescription = null)
+                    Text(if (prueba == PruebaConexion.SIN_PROBAR) " Probar conexión" else " Probar otra vez")
+                }
+            }
+        }
+    }
+}
+
 /** Un inventario: almacén, quién lo abrió, avance y sus botones. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TarjetaInventario(
     inv: InventarioDto,
     puedeEnviar: Boolean,
+    conexionLista: Boolean,
     trabajando: Boolean,
     alContar: () -> Unit,
     alEnviar: () -> Unit,
@@ -197,7 +239,8 @@ private fun TarjetaInventario(
                         Text(" Contar")
                     }
                     if (puedeEnviar) {
-                        OutlinedButton(onClick = alEnviar, enabled = !trabajando && inv.conteos > 0) {
+                        // Apagado hasta que la prueba de conexión salga bien
+                        OutlinedButton(onClick = alEnviar, enabled = !trabajando && inv.conteos > 0 && conexionLista) {
                             Icon(Icons.Filled.CloudUpload, contentDescription = null)
                             Text(" Enviar a Profit")
                         }

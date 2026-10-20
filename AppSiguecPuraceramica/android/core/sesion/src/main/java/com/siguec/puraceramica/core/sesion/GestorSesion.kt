@@ -154,6 +154,13 @@ class GestorSesion(contexto: Context) {
     suspend fun monedas(config: ConfigConexion): Resultado<List<MonedaDto>> =
         RepositorioAcceso(BaseDatos(config), dispositivo).monedas(config.baseProfit)
 
+    /**
+     * Prueba de conexión antes de enviar: ¿responde el SQL Server y se puede abrir la base de
+     * Profit de la empresa? (no graba nada).
+     */
+    suspend fun probarServidor(coEmpresa: String): Resultado<Unit> =
+        bd().usar(coEmpresa) { cx -> cx.consultarUno("SELECT 1 AS uno"); Unit }
+
     private fun bd() = BaseDatos(almacen.conexion)
     private fun acceso() = RepositorioAcceso(bd(), dispositivo)
 

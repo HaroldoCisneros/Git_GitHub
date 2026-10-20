@@ -16,11 +16,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
+/** Prueba de conexión antes de enviar ("Enviar a Profit" queda apagado hasta que dé LISTA). */
+enum class PruebaConexion { SIN_PROBAR, PROBANDO, LISTA, FALLO }
+
 /** Estado de la pantalla de inventarios. */
 data class EstadoInventarios(
     val inventarios: List<InventarioDto> = emptyList(), // Los del teléfono
     val cargando: Boolean = true,
     val trabajando: Boolean = false,                    // Enviando (con WiFi)
+    val conexion: PruebaConexion = PruebaConexion.SIN_PROBAR,
+    val mensajeConexion: String? = null,                // Por qué falló la prueba
     val aviso: String? = null
 )
 
@@ -53,6 +58,21 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
         }
     }
 
+    /** Botón "Probar conexión": hasta que responda el servidor no se puede enviar. */
+    fun probarConexion() {
+        if (_estado.value.conexion == PruebaConexion.PROBANDO) return
+        _estado.update { it.copy(conexion = PruebaConexion.PROBANDO, mensajeConexion = null) }
+        viewModelScope.launch {
+            val r = gestor.probarServidor(coEmpresa)
+            _estado.update {
+                when (r) {
+                    is Resultado.Exito -> it.copy(conexion = PruebaConexion.LISTA)
+                    is Resultado.Error -> it.copy(conexion = PruebaConexion.FALLO, mensajeConexion = r.mensaje)
+                }
+            }
+        }
+    }
+
     /**
      * "Enviar a Profit": manda TODOS los conteos de este teléfono en esa toma.
      * Si se corta el WiFi a mitad, se puede volver a intentar: no se duplica.
@@ -60,7 +80,9 @@ class InventariosViewModel(private val gestor: GestorSesion, private val coEmpre
     fun enviar(inventario: InventarioDto) {
         val usuario = gestor.usuario ?: return
         if (_estado.value.trabajando) return
-        _estado.update { it.copy(trabajando = true) }
+        // Solo después de una prueba de conexión correcta; cada envío pide una prueba nueva
+        if (_estado.value.conexion != PruebaConexion.LISTA) return
+        _estado.update { it.copy(trabajando = true, conexion = PruebaConexion.SIN_PROBAR) }
         viewModelScope.launch {
             // Red de seguridad: un error inesperado se muestra como aviso, nunca cierra la App
             // (lo contado sigue en el teléfono y se puede volver a enviar)

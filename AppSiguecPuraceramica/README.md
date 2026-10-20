@@ -42,7 +42,9 @@ primera vez que se escribe con WiFi.
   escaneo anota 1. Cada conteo es **individual** (queda a nombre de quien cuenta);
   el stock contado es la suma. Se puede borrar un conteo propio mientras no se haya enviado.
 
-Si se corta el WiFi justo al enviar, se vuelve a tocar "Enviar": el teléfono usa la
+Antes de enviar se toca **Probar conexión**: "Enviar a Profit" queda apagado hasta que la
+prueba sale bien. Si se corta el WiFi justo al enviar, la App avisa (no se cierra) y se vuelve
+a probar y a tocar "Enviar": el teléfono usa la
 misma **clave de envío** y SQL Server no lo recibe dos veces.
 
 ## Configuración (botón en la entrada y en el menú)

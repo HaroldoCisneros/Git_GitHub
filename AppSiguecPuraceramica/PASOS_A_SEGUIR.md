@@ -116,7 +116,8 @@ guardado); solo va al servidor si el teléfono no lo conoce o si el permiso se l
    cantidad → **Anotar**. *Modo rápido*: cada escaneo anota 1.
    Cada conteo queda a nombre de quien cuenta; se puede borrar un conteo propio.
 4. **Artículos**: consulta código, descripción y stock contado del inventario elegido.
-5. **Cerrar** (con WiFi): Inventarios → **Enviar a Profit**. Se crea en Profit un
+5. **Cerrar** (con WiFi): Inventarios → **Probar conexión** (el botón "Enviar a Profit" está
+   apagado hasta que la prueba sale bien; cada envío pide una prueba nueva) → **Enviar a Profit**. Se crea en Profit un
    **resultado de inventario** (`saResInventario` / `saResInventarioReng`, con el **correlativo
    de Profit** de `psObtenerProximoNumero`)
    con el usuario y la sucursal del registro del inventario y el **último costo** de cada

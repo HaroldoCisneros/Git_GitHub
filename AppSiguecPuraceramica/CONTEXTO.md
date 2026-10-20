@@ -77,6 +77,10 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
     SQLException; ahora atrapa cualquier falla (red, driver) y devuelve SIN_CONEXION, con una
     prueba rápida de socket (4 s) antes del driver. Red de seguridad en InventariosViewModel.enviar.
 
+17. **Prueba de conexión antes de enviar** (pedido del usuario): en Inventarios, "Enviar a
+    Profit" está apagado hasta que "Probar conexión" (SELECT 1 en la base de la empresa) sale
+    bien; después de cada envío vuelve a "sin probar".
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
