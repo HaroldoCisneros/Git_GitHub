@@ -87,8 +87,10 @@ F fabricación, M materia prima, N envase, E empaque), `anulado bit`,
 `co_art`, `modelo` o `ref`, y se busca en los tres (si coincide en varios, gana
 co_art, luego modelo, luego ref; sin distinguir mayúsculas).
 
-**Etiquetas con la fuente C39HrP48DhTt** = Code 39: el escáner la lee (es el primer
-formato configurado). Se quitan los asteriscos de inicio y fin (`*CER-001*`).
+**Etiquetas con la fuente C39HrP48DhTt** = Code 39 (confirmado con una etiqueta real:
+`*3065600601201*` → `3065600601201`). El escáner acepta SOLO Code 39, EAN-13 y Code 128
+(con autozoom): con ITF/Codabar/UPC-E activados devolvía números falsos al leer la etiqueta
+de lado o a medias. Se quitan los asteriscos de inicio y fin (`*CER-001*`).
 Code 39 solo codifica MAYÚSCULAS, números, espacio y `- . $ / + %`: un código con
 otros caracteres (ñ, _, #, minúsculas) no sale bien en la etiqueta.
 

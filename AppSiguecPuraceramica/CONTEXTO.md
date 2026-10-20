@@ -69,6 +69,10 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
       Sin servidor, con el hash recordado en el teléfono.
     - Bases de datos cambiables más adelante; cambiar la base de Profit cierra la sesión.
 
+15. **Escáner**: la etiqueta real (foto del usuario) es Code 39 `*3065600601201*`. Con 10
+    formatos activos el escáner daba números falsos (ITF/Codabar leen pedazos): ahora solo
+    Code 39, EAN-13 y Code 128, con autozoom (EscanerCodigo.kt).
+
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).

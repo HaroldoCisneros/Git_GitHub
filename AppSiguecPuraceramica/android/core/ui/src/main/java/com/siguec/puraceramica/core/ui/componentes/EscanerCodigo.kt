@@ -20,22 +20,18 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
  */
 object EscanerCodigo {
 
-    // Las etiquetas propias se imprimen con la fuente "C39HrP48DhTt" = CODE 39 (va primero).
-    // También los de fábrica (EAN/UPC) y Code 128/39 de
-    // etiquetas propias) y QR por si acaso. Limitar los formatos hace la lectura más rápida.
+    // Las etiquetas propias se imprimen con la fuente "C39HrP48DhTt" = CODE 39
+    // (ej. *3065600601201*, confirmado con la foto de una etiqueta real).
+    // SOLO formatos con estructura fuerte: antes también se aceptaban ITF, Codabar, UPC-E,
+    // EAN-8, Code 93 y QR, y con la etiqueta de lado o leída a medias el escáner devolvía
+    // números FALSOS (sobre todo ITF, que acepta pedazos de cualquier código numérico).
     private val opciones = GmsBarcodeScannerOptions.Builder()
         .setBarcodeFormats(
-            Barcode.FORMAT_CODE_39,  // Etiquetas con la fuente C39HrP48DhTt
-            Barcode.FORMAT_EAN_13,  // El más común en productos (13 dígitos)
-            Barcode.FORMAT_EAN_8,   // EAN corto
-            Barcode.FORMAT_UPC_A,   // Productos de EE. UU.
-            Barcode.FORMAT_UPC_E,   // UPC corto
-            Barcode.FORMAT_CODE_128, // Otras etiquetas impresas
-            Barcode.FORMAT_CODE_93,
-            Barcode.FORMAT_ITF,
-            Barcode.FORMAT_CODABAR,
-            Barcode.FORMAT_QR_CODE
+            Barcode.FORMAT_CODE_39,  // Etiquetas propias (fuente C39HrP48DhTt)
+            Barcode.FORMAT_EAN_13,   // Código de fábrica de los productos (tiene dígito de control)
+            Barcode.FORMAT_CODE_128  // Otras etiquetas impresas (tiene dígito de control)
         )
+        .enableAutoZoom()            // Acerca la cámara sola si la etiqueta se ve pequeña
         .build()
 
     /**

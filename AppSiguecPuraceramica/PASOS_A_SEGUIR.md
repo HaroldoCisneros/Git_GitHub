@@ -137,6 +137,7 @@ guardado); solo va al servidor si el teléfono no lo conoce o si el permiso se l
 |---|---|
 | "El nombre de columna 'puede_configurar' no es válido" / "le falta una columna" | La base se creó con scripts anteriores: ejecute de nuevo **completo** `02_tablas.sql` (F5 sin seleccionar nada; solo agrega lo que falta). |
 | "Usuario o clave incorrectos" la primera vez / no hay usuarios | `07_crear_admin.sql` → ADMIN / cambiar123 (la primera entrada con WiFi). |
+| Al escanear sale un número que no es el de la etiqueta | Corregido: el escáner solo acepta Code 39, EAN-13 y Code 128. Ponga la etiqueta **horizontal** en la pantalla, que se vea completa (con los `*`), a unos 15–20 cm. |
 | "No se pudo conectar con el servidor..." | WiFi de la empresa, IP/puerto en Configuración, TCP/IP habilitado, firewall. |
 | "El usuario o la clave de SQL Server no son correctos" | Paso 1.3 y Configuración; autenticación mixta. |
 | "No se pudo abrir la base ..." | Nombre de la base de la App o de la empresa (tabla `empresas`). |
