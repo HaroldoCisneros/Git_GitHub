@@ -98,9 +98,11 @@ está en UN solo archivo: `android/core/red/.../TomaFisica.kt`.
 | `co_uni` | Unidad principal del artículo en `saArtUnidad` |
 | `total_art` | Stock contado (suma de los conteos del teléfono) |
 | `total_art_teo` | Existencia actual en el almacén (`saStockAlmacen`, tipo `ACT`; 0 si no se puede leer) |
-| `sco_uni`, `stotal_art_teo`, `stotal_art`, `cost_unit` | NULL / 0 / 0 / 0 |
+| `cost_unit` | `dbo.ConsultarUltimoCosto(saArticulo.rowguid)`: último costo de entrada (sin REPO ni PROV) |
+| `sco_uni`, `stotal_art_teo`, `stotal_art` | NULL / 0 / 0 |
 
-Cada teléfono que envía crea **su propio resultado** del mismo inventario.
+Uso normal: **un teléfono por almacén / inventario abierto**. Si varios teléfonos
+cuentan el mismo inventario, cada uno envía **su propio resultado**.
 
 ## Instalación
 

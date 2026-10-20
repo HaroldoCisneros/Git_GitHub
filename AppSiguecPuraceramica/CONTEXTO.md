@@ -37,14 +37,18 @@ App Android en Kotlin (Compose) SOLO para el conteo del inventario contra
 10. **Enviar** = resultado de inventario de Profit (`saResInventario` + `saResInventarioReng`),
     con co_us_in / co_sucu_in del REGISTRO del inventario (pedido del usuario; se guardan al
     abrir, en el teléfono y en aperturas). num_resinv = 'APP' + id del envío. Cada teléfono
-    = un resultado. co_uni = unidad principal de saArtUnidad; total_art_teo de saStockAlmacen.
+    = un resultado (uso normal: UN teléfono por almacén/inventario abierto; el usuario aceptó
+    dejar así el caso de varios). co_uni = unidad principal de saArtUnidad; total_art_teo de
+    saStockAlmacen; cost_unit = dbo.ConsultarUltimoCosto(saArticulo.rowguid) (función de la
+    empresa, sql/05; parámetro profit.funcion_costo).
 
 ## POR CONFIRMAR con la base real
 - Que Profit acepte VARIOS resultados por inventario y los sume al procesarlo (si no, hay que
   enviar desde un solo teléfono o juntar en un resultado).
 - `saArtUnidad`: columna que marca la unidad principal (se usa uni_principal o equivalencia = 1
   si existen). `saStockAlmacen`: columnas co_alma, co_art, tipo ('ACT'), stock.
-- Moneda del resultado (`profit.co_mone`) y si `cost_unit` debe llevar el costo (hoy 0).
-- Si se prefiere el correlativo de Profit para num_resinv en vez de 'APP' + número.
+- Moneda del resultado (`profit.co_mone`).
+- **Correlativo de Profit para num_resinv**: el usuario está averiguando la tabla de
+  consecutivos; mientras tanto queda 'APP' + número del envío.
 - Compilar las pantallas en Android Studio (en la sesión no había acceso a Google Maven;
   :core:red sí se compiló y probó: 17 pruebas OK).

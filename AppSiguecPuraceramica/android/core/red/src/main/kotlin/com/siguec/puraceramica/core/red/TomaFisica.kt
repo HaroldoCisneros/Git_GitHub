@@ -60,7 +60,8 @@ interface TomaFisicaProfit {
  *                        co_alma NOT NULL, co_mone, tasa > 0, co_us_in/mo, co_sucu_in/mo, fe_us_in/mo.
  *   saResInventarioReng  Renglones: num_resinv, reng_num > 0, co_art (único por resultado), co_uni
  *                        (FK saArtUnidad), sco_uni, total_art_teo, total_art, stotal_art_teo, stotal_art,
- *                        cost_unit, co_us_in/mo, co_sucu_in/mo, fe_us_in/mo.
+ *                        cost_unit (= dbo.ConsultarUltimoCosto(saArticulo.rowguid)), co_us_in/mo,
+ *                        co_sucu_in/mo, fe_us_in/mo.
  *                        (validador = timestamp y rowguid = newid() los pone SQL Server)
  */
 object TomaFisica2K12 : TomaFisicaProfit {
@@ -85,7 +86,7 @@ object TomaFisica2K12 : TomaFisicaProfit {
     private const val SQL_RENGLON = """INSERT INTO dbo.saResInventarioReng (num_resinv, reng_num, co_art, co_uni, sco_uni,
         total_art_teo, total_art, stotal_art_teo, stotal_art, cost_unit, co_us_in, co_sucu_in, fe_us_in,
         co_us_mo, co_sucu_mo, fe_us_mo)
-        VALUES (?, ?, ?, ?, NULL, ?, ?, 0, 0, 0, ?, ?, GETDATE(), ?, ?, GETDATE())"""
+        VALUES (?, ?, ?, ?, NULL, ?, ?, 0, 0, ?, ?, ?, GETDATE(), ?, ?, GETDATE())"""
 
     /** Cuántos artículos por consulta "IN (?, ?, ...)" (SQL Server admite 2100 parámetros). */
     private const val LOTE = 500
@@ -127,6 +128,7 @@ object TomaFisica2K12 : TomaFisicaProfit {
                 sinUnidad.take(10).joinToString() + if (sinUnidad.size > 10) "..." else "", TipoError.VALIDACION)
         }
         val teorico = stockTeorico(cx, cfg, envio.coAlma, codigos)
+        val costos = ultimoCosto(cx, cfg, codigos)
         val moneda = cfg.coMone.ifEmpty { cx.consultarUno(SQL_ULTIMA_MONEDA)?.texto("co_mone").orEmpty() }
         if (moneda.isEmpty()) {
             throw ErrorApp("No se sabe la moneda del resultado: agregue el parámetro profit.co_mone en " +
@@ -141,7 +143,7 @@ object TomaFisica2K12 : TomaFisicaProfit {
         // Renglones: uno por artículo (UK num_resinv + co_art), numerados desde 1
         cx.ejecutarLote(SQL_RENGLON, codigos.mapIndexed { i, coArt ->
             listOf(envio.numResinv, i + 1, coArt, unidades.getValue(coArt), teorico[coArt] ?: BigDecimal.ZERO,
-                envio.totales.getValue(coArt), us, sucu, us, sucu)
+                envio.totales.getValue(coArt), costos[coArt] ?: BigDecimal.ZERO, us, sucu, us, sucu)
         })
     }
 
@@ -163,6 +165,26 @@ object TomaFisica2K12 : TomaFisicaProfit {
                 .forEach { f -> unidades.putIfAbsent(f.texto("co_art"), f.texto("co_uni")) }
         }
         return unidades
+    }
+
+    /**
+     * Costo unitario de cada artículo (cost_unit) con la función de la empresa
+     * dbo.ConsultarUltimoCosto(saArticulo.rowguid): el último costo de entrada sin REPO ni PROV
+     * (0 si nunca tuvo entrada).
+     */
+    private fun ultimoCosto(cx: Conexion, cfg: ConfigProfit, codigos: List<String>): Map<String, BigDecimal> {
+        val funcion = cfg.funcionCosto
+        if (cx.consultarUno("SELECT OBJECT_ID(?) AS id", "dbo.$funcion")?.get("id") == null) {
+            throw ErrorApp("No existe la función dbo.$funcion en la base de Profit (costo unitario del resultado).",
+                TipoError.SERVIDOR)
+        }
+        val costos = mutableMapOf<String, BigDecimal>()
+        codigos.chunked(LOTE).forEach { lote ->
+            cx.consultar("SELECT RTRIM(a.co_art) AS co_art, dbo.[$funcion](a.rowguid) AS costo FROM dbo.saArticulo a " +
+                "WHERE a.co_art IN (${lote.joinToString(",") { "?" }})", *lote.toTypedArray())
+                .forEach { f -> costos[f.texto("co_art")] = f.decimal("costo") }
+        }
+        return costos
     }
 
     /** Existencia actual de cada artículo en el almacén (total_art_teo). Si no se puede leer: 0. */

@@ -91,6 +91,9 @@ class ConexionTest {
         assertNotNull(ConfigProfit(prefijoResultado = "AP P").validar())
         assertNotNull(ConfigProfit(tasa = "0").validar())
         assertNull(ConfigProfit.desdeParametros(mapOf("profit.co_mone" to "BS")).validar())
+        // Costo unitario: función de la empresa (nombre validado porque va dentro del SQL)
+        assertEquals("ConsultarUltimoCosto", ConfigProfit().funcionCosto)
+        assertNotNull(ConfigProfit(funcionCosto = "x(); DROP TABLE y").validar())
     }
 
     @Test

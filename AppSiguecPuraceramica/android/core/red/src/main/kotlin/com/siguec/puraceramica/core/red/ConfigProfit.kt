@@ -38,12 +38,14 @@ data class ConfigProfit(
     val tablaStock: String = "saStockAlmacen",
     val colStockTipo: String = "tipo",          // "" = la tabla no tiene tipo
     val tipoStockActual: String = "ACT",
-    val colStockCantidad: String = "stock"
+    val colStockCantidad: String = "stock",
+    // Costo unitario de cada renglón: función de la empresa que recibe saArticulo.rowguid
+    val funcionCosto: String = "ConsultarUltimoCosto"
 ) {
     /** null = todo bien; si no, el nombre que no es válido. */
     fun validar(): String? =
         (listOf(tablaArticulos, colCodigo, colDescripcion, colAnulado, colTipo, tablaCodigosBarra, colCodigoBarra,
-            colCodigoBarraArticulo, tablaStock, colStockTipo, colStockCantidad) + columnasCodigo)
+            colCodigoBarraArticulo, tablaStock, colStockTipo, colStockCantidad, funcionCosto) + columnasCodigo)
             .filter { it.isNotEmpty() }
             .firstOrNull { !PATRON.matches(it) }
             ?.let { "Nombre no válido de tabla o columna de Profit: '$it'" }
@@ -83,7 +85,8 @@ data class ConfigProfit(
                 tablaStock = v("tabla_stock", d.tablaStock),
                 colStockTipo = v("col_stock_tipo", d.colStockTipo),
                 tipoStockActual = v("tipo_stock_actual", d.tipoStockActual),
-                colStockCantidad = v("col_stock_cantidad", d.colStockCantidad)
+                colStockCantidad = v("col_stock_cantidad", d.colStockCantidad),
+                funcionCosto = v("funcion_costo", d.funcionCosto)
             )
         }
     }
