@@ -153,7 +153,7 @@ fun etiquetaVencimiento(vencimiento: Long): String {
     val dias = ChronoUnit.DAYS.between(LocalDate.now(zona), Instant.ofEpochMilli(vencimiento).atZone(zona).toLocalDate())
     return when {
         dias < 0 -> "Vencida hace ${-dias} día(s)"
-        dias == 0 -> "Vence hoy"
+        dias == 0L -> "Vence hoy"
         else -> "Vence en $dias día(s)"
     }
 }
