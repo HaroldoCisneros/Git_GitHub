@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Carrito de compras blanco centrado (zona segura 66dp de 108dp) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M14,36c-2.2,0 -3.99,1.8 -3.99,4S11.8,44 14,44s4,-1.8 4,-4 -1.8,-4 -4,-4zM2,4v4h4l7.2,15.17 -2.7,4.9c-0.32,0.56 -0.5,1.22 -0.5,1.93 0,2.2 1.8,4 4,4h24v-4H14.85c-0.28,0 -0.5,-0.22 -0.5,-0.5l0.06,-0.24L16.2,26h14.9c1.5,0 2.82,-0.82 3.5,-2.06l7.16,-12.98C41.92,10.68 42,10.34 42,10c0,-1.1 -0.9,-2 -2,-2H10.42l-1.88,-4H2zM34,36c-2.2,0 -3.99,1.8 -3.99,4S31.8,44 34,44s4,-1.8 4,-4 -1.8,-4 -4,-4z" />
+    </group>
+</vector>

@@ -1,0 +1,4 @@
+-keep class net.sourceforge.jtds.** { *; }
+-dontwarn net.sourceforge.jtds.**
+-dontwarn javax.naming.**
+-dontwarn org.ietf.jgss.**
