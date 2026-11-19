@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Impresión de etiquetas de productos en impresoras Zebra (lenguaje ZPL).
+Impresión de etiquetas desde la línea de comandos (CSV o un código). La ventana
+que lee los artículos de SQL Server es app.py.
 
 Solo usa la biblioteca estándar de Python 3.
 
@@ -21,90 +22,9 @@ Ejemplos:
 
 import argparse
 import csv
-import socket
 import sys
-from dataclasses import dataclass
 
-
-@dataclass
-class Producto:
-    codigo: str
-    nombre: str
-    precio: str
-    copias: int = 1
-
-
-def escapar_zpl(texto: str) -> str:
-    """Escapa los caracteres especiales de ZPL (se usa junto con ^FH\\)."""
-    return (
-        texto.replace("\\", "\\5C")
-        .replace("^", "\\5E")
-        .replace("~", "\\7E")
-    )
-
-
-def formatear_precio(precio: str, moneda: str) -> str:
-    try:
-        valor = float(str(precio).replace(",", "."))
-    except ValueError:
-        return f"{moneda} {precio}".strip()
-    # Formato 1.234,56
-    texto = f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"{moneda} {texto}".strip()
-
-
-def modulos_code128(codigo: str) -> int:
-    """Estima el ancho (en módulos) de un Code 128 en modo automático."""
-    if codigo.isdigit():
-        simbolos = len(codigo) // 2 + (len(codigo) % 2) * 2  # subconjunto C (+cambio si es impar)
-    else:
-        simbolos = len(codigo)
-    return 11 * (simbolos + 2) + 2  # + inicio y verificación, + parada (13)
-
-
-def generar_zpl(p: Producto, ancho_mm: float, alto_mm: float, dpi: int, moneda: str) -> str:
-    """Genera el ZPL de una etiqueta. El diseño se escala según tamaño y DPI."""
-    pd = dpi / 25.4                      # puntos por milímetro
-    ancho = round(ancho_mm * pd)
-    alto = round(alto_mm * pd)
-    m = round(2 * pd)                    # margen de 2 mm
-    util = ancho - 2 * m
-
-    letra_nombre = round(alto * 0.11)
-    letra_precio = round(alto * 0.20)
-    alto_barras = round(alto * 0.28)
-
-    y_nombre = m
-    y_precio = y_nombre + 2 * letra_nombre + round(1 * pd)
-    y_barras = y_precio + letra_precio + round(1.5 * pd)
-
-    # Código de barras: módulo lo más ancho posible sin salirse, y centrado
-    modulos = modulos_code128(p.codigo.strip())
-    ancho_modulo = max(1, min(3 if dpi <= 203 else 4, util // modulos))
-    x_barras = max(0, (ancho - modulos * ancho_modulo) // 2)
-
-    nombre = escapar_zpl(p.nombre.strip())
-    codigo = escapar_zpl(p.codigo.strip())
-    precio = escapar_zpl(formatear_precio(p.precio, moneda))
-
-    return "\n".join([
-        "^XA",
-        "^CI28",                                   # UTF-8 (acentos, ñ)
-        f"^PW{ancho}",
-        f"^LL{alto}",
-        "^LH0,0",
-        # Nombre del producto (hasta 2 líneas, centrado)
-        f"^FO{m},{y_nombre}^A0N,{letra_nombre},{letra_nombre}"
-        f"^FB{util},2,0,C^FH\\^FD{nombre}^FS",
-        # Precio
-        f"^FO{m},{y_precio}^A0N,{letra_precio},{letra_precio}"
-        f"^FB{util},1,0,C^FH\\^FD{precio}^FS",
-        # Código de barras Code 128 con texto legible debajo
-        f"^BY{ancho_modulo},2,{alto_barras}",
-        f"^FO{x_barras},{y_barras}^BCN,{alto_barras},Y,N,N,A^FH\\^FD{codigo}^FS",
-        f"^PQ{max(1, p.copias)}",
-        "^XZ",
-    ])
+from zpl import FORMATOS, Producto, enviar_dispositivo, enviar_red, generar_lote
 
 
 def leer_csv(ruta: str) -> list[Producto]:
@@ -133,16 +53,6 @@ def leer_csv(ruta: str) -> list[Producto]:
     return productos
 
 
-def enviar_red(zpl: str, host: str, puerto: int = 9100, timeout: float = 10) -> None:
-    with socket.create_connection((host, puerto), timeout=timeout) as s:
-        s.sendall(zpl.encode("utf-8"))
-
-
-def enviar_dispositivo(zpl: str, ruta: str) -> None:
-    with open(ruta, "wb") as f:
-        f.write(zpl.encode("utf-8"))
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description="Imprime etiquetas de productos en impresoras Zebra (ZPL).")
     origen = ap.add_argument_group("Productos")
@@ -159,8 +69,8 @@ def main() -> int:
     destino.add_argument("--salida", help="Guardar el ZPL en este archivo")
 
     formato = ap.add_argument_group("Formato de etiqueta")
-    formato.add_argument("--ancho", type=float, default=50, help="Ancho en mm (default 50)")
-    formato.add_argument("--alto", type=float, default=25, help="Alto en mm (default 25)")
+    formato.add_argument("--formato", default=next(iter(FORMATOS)), choices=list(FORMATOS),
+                         help="Formato de etiqueta")
     formato.add_argument("--dpi", type=int, default=203, choices=[152, 203, 300, 600])
     formato.add_argument("--moneda", default="Bs.", help='Símbolo de moneda (default "Bs.")')
 
@@ -172,7 +82,7 @@ def main() -> int:
             for p in productos:
                 p.copias = a.copias
     elif a.codigo:
-        productos = [Producto(a.codigo, a.nombre, a.precio, a.copias)]
+        productos = [Producto(codigo=a.codigo, nombre=a.nombre, precio=a.precio, copias=a.copias)]
     else:
         ap.error("Indique --csv o --codigo")
 
@@ -180,7 +90,7 @@ def main() -> int:
         print("No hay productos para imprimir.", file=sys.stderr)
         return 1
 
-    zpl = "\n".join(generar_zpl(p, a.ancho, a.alto, a.dpi, a.moneda) for p in productos) + "\n"
+    zpl = generar_lote(productos, FORMATOS[a.formato], a.dpi, a.moneda)
     total = sum(p.copias for p in productos)
 
     if not (a.impresora or a.dispositivo or a.salida):

@@ -1,46 +1,60 @@
 # Etiquetas Zebra
 
-Programa en Python (sin dependencias externas) para imprimir etiquetas de productos
-en impresoras Zebra usando ZPL.
+Programa para imprimir etiquetas de artículos en impresoras Zebra (ZPL), leyendo
+los artículos de la tabla `art` de SQL Server (Profit), aunque el servidor esté en un contenedor Docker.
 
-Cada etiqueta lleva: **descripción** (hasta 2 líneas), **precio** y **código de barras Code 128**.
-Tamaño por defecto: 50 × 25 mm a 203 dpi (configurable).
+Cada etiqueta lleva **descripción**, **precio** y **código de barras Code 128**.
+
+## Formatos
+
+| Formato                 | Tamaño (ancho × alto)  |
+|-------------------------|------------------------|
+| `3 x 2,2 cm vertical`   | 22 × 30 mm             |
+| `5 x 2,5 cm horizontal` | 50 × 25 mm             |
+
+Los formatos se definen en `zpl.py` (`FORMATOS`). Para agregar uno basta con copiar una entrada y cambiar las medidas.
+
+## Instalación
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+cp config.ini.ejemplo config.ini
+```
+
+En `config.ini` se indican el servidor SQL, la tabla/columnas y la impresora:
+
+- **SQL en Docker en el mismo equipo:** `servidor = localhost` y el puerto publicado del contenedor (normalmente `1433`).
+- **Impresora**, según `tipo`:
+  - `red`: `destino` es la IP de la Zebra (puerto 9100).
+  - `windows`: `destino` es el nombre de la impresora instalada en Windows (requiere `pip install pywin32`).
+  - `dispositivo`: `/dev/usb/lp0` en Linux o `\\PC-CAJA\Zebra` si está compartida.
+  - `archivo`: guarda el ZPL en un archivo (para pruebas).
 
 ## Uso
 
-Una etiqueta a una Zebra en red (puerto RAW 9100):
-
 ```bash
-python etiquetas_zebra.py --codigo 7591234567890 --nombre "Arroz 1Kg" --precio 45,50 --impresora 192.168.1.50
+python app.py
 ```
 
-Varias desde un CSV (`codigo;nombre;precio;copias`, separador `,` o `;`):
+El interruptor de arriba cambia entre los dos modos:
 
-```bash
-python etiquetas_zebra.py --csv productos.csv --impresora 192.168.1.50
-```
+- **Un artículo:** se escribe o escanea el código, se indica la **cantidad** de etiquetas y se pulsa **Imprimir**.
+- **Lista de 10 artículos:** hasta 10 códigos distintos y se imprime una etiqueta de cada uno.
+  Si algún código no existe, el programa avisa y pregunta si se imprimen los demás.
 
-Impresora USB en Linux o compartida en Windows:
-
-```bash
-python etiquetas_zebra.py --csv productos.csv --dispositivo /dev/usb/lp0
-python etiquetas_zebra.py --csv productos.csv --dispositivo \\PC-CAJA\Zebra
-```
-
-Solo generar el archivo ZPL (sin imprimir); sin ningún destino, el ZPL se muestra en pantalla:
-
-```bash
-python etiquetas_zebra.py --csv productos.csv --salida etiquetas.zpl
-```
-
-## Opciones de formato
-
-| Opción     | Default | Descripción                     |
-|------------|---------|---------------------------------|
-| `--ancho`  | 50      | Ancho de la etiqueta en mm      |
-| `--alto`   | 25      | Alto de la etiqueta en mm       |
-| `--dpi`    | 203     | Resolución: 152, 203, 300 o 600 |
-| `--moneda` | `Bs.`   | Símbolo antes del precio        |
-| `--copias` | 1       | Copias por producto             |
+Al pulsar Enter en un código se muestran su precio y su descripción. **Buscar…** (o **F2** en la lista) abre
+una búsqueda por descripción: Enter busca, y un segundo Enter elige el primer resultado.
+**Guardar ZPL…** guarda las etiquetas en un archivo en vez de imprimirlas. **Ctrl+P** imprime.
 
 Para ver cómo queda un `.zpl` sin gastar etiquetas, se puede pegar en https://labelary.com/viewer.html
+
+## Línea de comandos (opcional)
+
+`etiquetas_zebra.py` imprime desde un CSV o un solo código, sin base de datos:
+
+```bash
+python etiquetas_zebra.py --csv productos.csv --formato "3 x 2,2 cm vertical" --impresora 192.168.1.50
+```

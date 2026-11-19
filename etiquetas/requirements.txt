@@ -1,0 +1,3 @@
+pymssql
+# Solo si la Zebra está instalada como impresora de Windows (tipo = windows):
+# pywin32
