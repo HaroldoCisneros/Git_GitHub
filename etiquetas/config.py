@@ -18,8 +18,11 @@ Ejemplo de config.xml:
 import configparser
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import sys
 
-CARPETA = Path(__file__).resolve().parent
+# Carpeta del programa: junto al .exe cuando está empaquetado con PyInstaller
+CARPETA = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
+           else Path(__file__).resolve().parent)
 RUTA = CARPETA / "config.xml"
 
 # Secciones y valores por defecto (también definen el orden en el XML)
@@ -51,6 +54,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "moneda": "Bs.",
         "logo": "",             # imagen del logo (png, jpg, bmp); vacío = sin logo
         "precio": "no",         # si | no: imprimir el precio
+        "girar": "0",           # 0 | 180: girar la etiqueta si sale al revés
     },
 }
 

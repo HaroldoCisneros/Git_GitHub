@@ -72,14 +72,35 @@ El interruptor de arriba cambia entre los dos modos:
 Arriba se puede **cambiar la impresora** antes de imprimir: la primera de la lista es la de la configuración
 (predeterminada) y después aparecen todas las impresoras instaladas en Windows (por ejemplo, una 3nStar).
 
-**Vista previa** muestra en pantalla cómo quedarán las etiquetas (la letra es aproximada).
+**Vista previa** muestra en pantalla cómo quedarán las etiquetas, tal como se imprimen.
 
 Al pulsar Enter en un código se muestran su precio y su descripción. **Buscar…** (o **F2** en la lista) abre
 una búsqueda por descripción: Enter busca, y un segundo Enter elige el primer resultado.
 **Guardar ZPL…** guarda las etiquetas en un archivo en vez de imprimirlas. **Ctrl+P** imprime.
 
-Las etiquetas se envían en lenguaje **ZPL**. Las impresoras de otras marcas (como 3nStar) deben tener
-activada la emulación ZPL.
+Las etiquetas se envían en lenguaje **ZPL** (como gráfico `^GFA`). Las impresoras de otras marcas
+(como 3nStar) deben tener activada la emulación ZPL.
+
+## Orientación
+
+La etiqueta se dibuja completa como imagen a la resolución de la impresora (el código de barras punto por
+punto) y se envía como un gráfico ZPL. En el formato `3 x 2,2 cm vertical` la imagen se gira 90°, porque
+ese rollo pasa por la impresora con los 3 cm a lo ancho del cabezal. Si sale al revés, marque
+**Girar 180°** en la configuración. La vista previa es exactamente lo que se imprime.
+
+## Ejecutable (.exe)
+
+- **Automático:** cada cambio en `etiquetas/` genera `EtiquetasZebra.exe` en GitHub Actions
+  (pestaña *Actions* → *Ejecutable etiquetas Zebra* → *Artifacts*), después de pasar las pruebas en Windows.
+- **En su PC:** doble clic en `generar_exe.bat`; el ejecutable queda en `dist\EtiquetasZebra.exe`.
+
+El `.exe` no necesita Python. `config.xml` y el logo se guardan **junto al .exe**.
+
+## Pruebas
+
+```bash
+py -m pytest tests
+```
 
 ## Línea de comandos (opcional)
 

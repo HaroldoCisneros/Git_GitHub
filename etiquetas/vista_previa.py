@@ -1,9 +1,8 @@
 """
-Vista previa aproximada de las etiquetas: dibuja con Pillow el mismo ZPL que se
-envía a la impresora (solo los comandos que usa este programa).
+Vista previa de las etiquetas.
 
-La letra es parecida a la de la Zebra pero no idéntica; las posiciones, el logo y
-el código de barras sí son los reales.
+Las etiquetas se imprimen como imagen, así que la vista previa es exacta.
+renderizar() además dibuja un archivo ZPL (solo los comandos que usa este programa).
 """
 
 import re
@@ -11,18 +10,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-# Code 128: anchos barra/espacio de los símbolos 0..105 y el de parada
-_C128 = ("212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 "
-         "112232 122132 122231 113222 123122 123221 223211 221132 221231 213212 223112 312131 "
-         "311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 "
-         "112313 132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 "
-         "313121 211331 231131 213113 213311 213131 311123 311321 331121 312113 312311 332111 "
-         "314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 "
-         "122411 142112 142211 241211 221114 413111 241112 134111 111242 121142 121241 114212 "
-         "124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 131141 114113 "
-         "114311 411113 411311 113141 114131 311141 411131 211412 211214 211232").split()
-_STOP = "2331112"
-_START_B, _START_C, _CODE_B, _CODE_C = 104, 105, 100, 99
+from zpl import C128 as _C128, C128_PARADA as _STOP, code128  # noqa: E402,F401
 
 _FUENTES = [
     "arialbd.ttf", "C:/Windows/Fonts/arialbd.ttf",
@@ -43,29 +31,6 @@ def _fuente(tam: int):
         return ImageFont.load_default(size=tam)
     except TypeError:
         return ImageFont.load_default()
-
-
-def code128(datos: str) -> list[int]:
-    """Símbolos Code 128 en modo automático (C para pares de dígitos, B para el resto)."""
-    simbolos: list[int] = []
-    i, modo = 0, None
-    while i < len(datos):
-        digitos = len(re.match(r"\d*", datos[i:]).group())
-        if digitos >= 4 or (modo == "C" and digitos >= 2) or (i == 0 and digitos == len(datos) and digitos % 2 == 0 and digitos):
-            if modo != "C":
-                simbolos.append(_START_C if modo is None else _CODE_C)
-                modo = "C"
-            simbolos.append(int(datos[i:i + 2]))
-            i += 2
-        else:
-            if modo != "B":
-                simbolos.append(_START_B if modo is None else _CODE_B)
-                modo = "B"
-            simbolos.append(ord(datos[i]) - 32)
-            i += 1
-    control = simbolos[0] + sum(k * s for k, s in enumerate(simbolos[1:], start=1))
-    simbolos.append(control % 103)
-    return simbolos
 
 
 def _dibujar_barras(dib, x, y, datos, modulo, alto):
@@ -170,9 +135,12 @@ def renderizar(zpl: str) -> list[Image.Image]:
     return imagenes
 
 
-def lamina(zpl: str, escala: int = 3, por_fila: int = 5, maximo: int = 10) -> Image.Image:
-    """Etiquetas una al lado de la otra, ampliadas, con borde redondeado como en el rollo."""
-    etiquetas = renderizar(zpl)[:maximo]
+def lamina(etiquetas, escala: int = 3, por_fila: int = 5, maximo: int = 10) -> Image.Image:
+    """Etiquetas una al lado de la otra, ampliadas, con borde redondeado como en el rollo.
+    Recibe una lista de imágenes o un texto ZPL."""
+    if isinstance(etiquetas, str):
+        etiquetas = renderizar(etiquetas)
+    etiquetas = list(etiquetas)[:maximo]
     if not etiquetas:
         return Image.new("RGB", (10, 10), "white")
     w, h = etiquetas[0].width * escala, etiquetas[0].height * escala

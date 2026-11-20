@@ -1,0 +1,59 @@
+name: Ejecutable etiquetas Zebra
+
+on:
+  push:
+    paths:
+      - "etiquetas/**"
+      - ".github/workflows/etiquetas-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: etiquetas
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt pyinstaller pytest
+
+      - name: Impresora de prueba (escribe lo que recibe en un archivo)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force C:\prueba | Out-Null
+          Add-PrinterDriver -Name "Generic / Text Only"
+          Add-PrinterPort -Name "C:\prueba\salida.prn"
+          Add-Printer -Name "Zebra Prueba" -DriverName "Generic / Text Only" -PortName "C:\prueba\salida.prn"
+          Get-Printer | Format-Table Name, DriverName, PortName
+
+      - name: Pruebas
+        env:
+          ETIQUETAS_IMPRESORA: Zebra Prueba
+          ETIQUETAS_SALIDA: C:\prueba\salida.prn
+        run: python -m pytest tests -v
+
+      - name: Lista de impresoras que ve el programa
+        run: python winprint.py
+
+      - name: Generar EtiquetasZebra.exe
+        run: python -m PyInstaller --noconfirm --clean EtiquetasZebra.spec
+
+      - name: Comprobar que el ejecutable arranca
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\EtiquetasZebra.exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) { throw "El ejecutable se cerró al arrancar (código $($p.ExitCode))" }
+          Stop-Process $p
+          Get-Item dist\EtiquetasZebra.exe | Format-List Name, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EtiquetasZebra
+          path: etiquetas/dist/EtiquetasZebra.exe

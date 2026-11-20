@@ -140,6 +140,9 @@ class Editor(tk.Toplevel):
         self.con_precio = tk.BooleanVar(value=et["precio"].get().lower() in ("si", "sí", "1", "true"))
         ttk.Checkbutton(f, text="Imprimir el precio", variable=self.con_precio).grid(
             row=2, column=1, sticky="w", padx=6)
+        self.girar = tk.BooleanVar(value=et["girar"].get().strip() == "180")
+        ttk.Checkbutton(f, text="Girar 180° (si la etiqueta sale al revés)",
+                        variable=self.girar).grid(row=5, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Logo:").grid(row=3, column=0, sticky="w", pady=2)
         fila = ttk.Frame(f)
         fila.grid(row=3, column=1, sticky="w", padx=6)
@@ -211,6 +214,7 @@ class Editor(tk.Toplevel):
     # ------------------------------------------------------------ datos
     def _valores(self) -> config.Config:
         self.vars["etiqueta"]["precio"].set("si" if self.con_precio.get() else "no")
+        self.vars["etiqueta"]["girar"].set("180" if self.girar.get() else "0")
         return config.Config({s: {k: v.get().strip() for k, v in vs.items()}
                               for s, vs in self.vars.items()})
 
@@ -259,7 +263,8 @@ class Editor(tk.Toplevel):
                          precio=1234.56, referencia="REF-0001")
         try:
             texto = zpl.generar_zpl(p, zpl.FORMATOS[et["formato"]], cfg.entero("impresora", "dpi"),
-                                    et["moneda"], et["logo"], et["precio"] == "si")
+                                    et["moneda"], et["logo"], et["precio"] == "si",
+                                    cfg.entero("etiqueta", "girar"))
             zpl.enviar(texto, imp["tipo"], imp["destino"], cfg.entero("impresora", "puerto"))
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Impresora", f"No se pudo imprimir:\n\n{e}", parent=self)

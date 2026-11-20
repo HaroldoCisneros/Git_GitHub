@@ -147,6 +147,7 @@ class App(tk.Tk):
         self.moneda = self.cfg["etiqueta"]["moneda"]
         self.logo = self.cfg["etiqueta"]["logo"]
         self.con_precio = self.cfg["etiqueta"]["precio"].lower() in ("si", "sí", "1", "true")
+        self.girar = self.cfg.entero("etiqueta", "girar")
         self.cache = {}
 
     def _cargar_impresoras(self):
@@ -254,11 +255,20 @@ class App(tk.Tk):
         except Exception as e:  # noqa: BLE001
             self._error_bd(e)
             return None
+        formato = zpl.FORMATOS[self.formato.get()]
         faltan = [c for c, p in resultado.items() if p is None]
+        largos = [c for c, p in resultado.items()
+                  if p is not None and not zpl.cabe_barras(p.barras or p.codigo, formato, self.dpi)]
         productos = [zpl.Producto(**{**p.__dict__, "copias": copias})
-                     for c in codigos if (p := resultado[c]) is not None]
-        if faltan:
-            msg = "Estos códigos no existen:\n  " + "\n  ".join(faltan)
+                     for c in codigos if (p := resultado[c]) is not None and c not in largos]
+        if faltan or largos:
+            msg = ""
+            if faltan:
+                msg += "Estos códigos no existen:\n  " + "\n  ".join(faltan) + "\n\n"
+            if largos:
+                msg += (f"Estos códigos son demasiado largos para el formato «{self.formato.get()}»"
+                        " (el código de barras no cabe):\n  " + "\n  ".join(largos) + "\n\n")
+            msg = msg.strip()
             if not productos:
                 messagebox.showwarning("Etiquetas", msg)
                 return None
@@ -268,7 +278,7 @@ class App(tk.Tk):
 
     def _zpl(self, productos) -> str:
         return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], self.dpi, self.moneda,
-                                self.logo, self.con_precio)
+                                self.logo, self.con_precio, self.girar)
 
     # ------------------------------------------------------------ acciones
     def imprimir(self):
@@ -293,8 +303,10 @@ class App(tk.Tk):
             return
         try:
             import vista_previa
-            imagen = vista_previa.lamina(self._zpl([zpl.Producto(**{**p.__dict__, "copias": 1})
-                                                    for p in productos]))
+            formato = zpl.FORMATOS[self.formato.get()]
+            imagen = vista_previa.lamina([
+                zpl.imagen_etiqueta(p, formato, self.dpi, self.moneda, self.logo, self.con_precio)
+                for p in productos[:10]])
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Vista previa", f"No se pudo generar la vista previa:\n\n{e}")
             return
@@ -312,7 +324,7 @@ class App(tk.Tk):
         lbl.pack(padx=8, pady=8)
         total = sum(p.copias for p in productos)
         ttk.Label(win, text=f"{len(productos)} artículo(s), {total} etiqueta(s) en total. "
-                            "La letra es aproximada.", foreground="#555").pack(pady=(0, 8))
+                            "Así se verá impresa.", foreground="#555").pack(pady=(0, 8))
         win.bind("<Escape>", lambda _e: win.destroy())
 
     def guardar_zpl(self):
