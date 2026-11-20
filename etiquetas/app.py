@@ -14,10 +14,11 @@ import io
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-import zpl
 import config
+import tema
 import winprint
-from db import Articulos
+import zpl
+from db import CAMPOS_BUSQUEDA, Articulos
 from iconos import poner_icono
 
 FILAS_LISTA = 10
@@ -28,7 +29,7 @@ class Interruptor(tk.Canvas):
 
     def __init__(self, padre, variable: tk.BooleanVar, comando=None, ancho=52, alto=26):
         super().__init__(padre, width=ancho, height=alto, highlightthickness=0,
-                         bg=padre.winfo_toplevel()["bg"], cursor="hand2")
+                         bg=tema.FONDO, cursor="hand2")
         self.var, self.comando, self.w, self.h = variable, comando, ancho, alto
         self.bind("<Button-1>", self._cambiar)
         self.var.trace_add("write", lambda *_: self._dibujar())
@@ -42,7 +43,7 @@ class Interruptor(tk.Canvas):
     def _dibujar(self):
         self.delete("all")
         w, h, r = self.w, self.h, self.h / 2
-        color = "#2e7d32" if self.var.get() else "#1565c0"
+        color = tema.ROJO if self.var.get() else tema.AZUL
         self.create_oval(0, 0, h, h, fill=color, outline=color)
         self.create_oval(w - h, 0, w, h, fill=color, outline=color)
         self.create_rectangle(r, 0, w - r, h, fill=color, outline=color)
@@ -53,9 +54,11 @@ class Interruptor(tk.Canvas):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Etiquetas Zebra")
+        self.title("Etiquetas - Ferretería Prados")
         poner_icono(self, "logoapp.bmp")
         self.resizable(False, False)
+        tema.aplicar(self)
+        self.campo_busqueda = tk.StringVar(value="descripcion")
 
         self._leer_config()
 
@@ -70,6 +73,7 @@ class App(tk.Tk):
 
     # ------------------------------------------------------------ interfaz
     def _construir(self):
+        tema.colocar_encabezado(self, "Etiquetas de artículos", "F2 buscar  ·  Ctrl+P imprimir")
         cuerpo = ttk.Frame(self, padding=12)
         cuerpo.pack(fill="both", expand=True)
 
@@ -82,11 +86,12 @@ class App(tk.Tk):
         self.cb_imp = ttk.Combobox(arriba, state="readonly", width=34)
         self.cb_imp.pack(side="left", padx=4)
         self._cargar_impresoras()
-        ttk.Button(arriba, text="Configuración…", command=self.configurar).pack(side="right")
+        ttk.Button(arriba, text="Configuración…", style="Suave.TButton",
+                   command=self.configurar).pack(side="right")
 
         sw = ttk.Frame(cuerpo, padding=(0, 12))
         sw.pack(fill="x")
-        self.lbl_unico = ttk.Label(sw, text="Un artículo", font=("", 10, "bold"))
+        self.lbl_unico = ttk.Label(sw, text="Un artículo", font=("", 10, "bold"), foreground=tema.AZUL)
         self.lbl_unico.pack(side="left")
         Interruptor(sw, self.modo_lista, self._aplicar_modo).pack(side="left", padx=8)
         self.lbl_lista = ttk.Label(sw, text=f"Lista de {FILAS_LISTA} artículos")
@@ -98,7 +103,7 @@ class App(tk.Tk):
         ttk.Label(self.marco_unico, text="Código:").grid(row=0, column=0, sticky="w")
         self.cod_unico = ttk.Entry(self.marco_unico, width=22)
         self.cod_unico.grid(row=0, column=1, sticky="w", padx=4)
-        ttk.Button(self.marco_unico, text="Buscar…",
+        ttk.Button(self.marco_unico, text="Buscar (F2)", style="Suave.TButton",
                    command=lambda: self._dialogo_buscar(self.cod_unico, self.info_unico)
                    ).grid(row=0, column=2, padx=4)
         ttk.Label(self.marco_unico, text="Cantidad:").grid(row=0, column=3, sticky="e", padx=(16, 0))
@@ -122,21 +127,35 @@ class App(tk.Tk):
             info = ttk.Label(self.marco_lista, text="", width=60)
             info.grid(row=i, column=2, sticky="w")
             self._enlazar(e, info)
-            e.bind("<F2>", lambda _ev, e=e, info=info: self._dialogo_buscar(e, info))
             self.cod_lista.append(e)
             self.info_lista.append(info)
 
         # --- Botones
         abajo = ttk.Frame(cuerpo, padding=(0, 12, 0, 0))
         abajo.pack(fill="x")
-        ttk.Button(abajo, text="Imprimir", command=self.imprimir).pack(side="right")
-        ttk.Button(abajo, text="Guardar ZPL…", command=self.guardar_zpl).pack(side="right", padx=6)
+        ttk.Button(abajo, text="🖨  Imprimir", style="Principal.TButton",
+                   command=self.imprimir).pack(side="right")
+        ttk.Button(abajo, text="Guardar ZPL…", style="Suave.TButton",
+                   command=self.guardar_zpl).pack(side="right", padx=6)
         ttk.Button(abajo, text="Vista previa", command=self.vista_previa).pack(side="right")
-        ttk.Button(abajo, text="Limpiar", command=self.limpiar).pack(side="left")
+        ttk.Button(abajo, text="Limpiar", style="Suave.TButton", command=self.limpiar).pack(side="left")
 
-        self.estado = ttk.Label(self, text="Listo", relief="sunken", anchor="w", padding=(6, 2))
+        self.estado = ttk.Label(self, text="Listo", style="Estado.TLabel", anchor="w")
         self.estado.pack(fill="x", side="bottom")
         self.bind("<Control-p>", lambda _e: self.imprimir())
+        self.bind("<F2>", self._f2)
+
+    def _f2(self, _evento=None):
+        """F2: busca para el código que tiene el cursor (o el primero vacío)."""
+        if self.modo_lista.get():
+            pares = list(zip(self.cod_lista, self.info_lista))
+            foco = self.focus_get()
+            elegido = next(((e, i) for e, i in pares if e is foco), None)
+            if elegido is None:
+                elegido = next(((e, i) for e, i in pares if not e.get().strip()), pares[-1])
+            self._dialogo_buscar(*elegido)
+        else:
+            self._dialogo_buscar(self.cod_unico, self.info_unico)
 
     def _leer_config(self):
         self.cfg = config.cargar()
@@ -205,8 +224,10 @@ class App(tk.Tk):
                 except tk.TclError:
                     pass
         # Spinbox y Combobox vuelven a su estado adecuado
-        self.lbl_unico.configure(font=("", 10, "normal" if lista else "bold"))
-        self.lbl_lista.configure(font=("", 10, "bold" if lista else "normal"))
+        self.lbl_unico.configure(font=("", 10, "normal" if lista else "bold"),
+                                 foreground=tema.GRIS if lista else tema.AZUL)
+        self.lbl_lista.configure(font=("", 10, "bold" if lista else "normal"),
+                                 foreground=tema.ROJO if lista else tema.GRIS)
         (self.cod_lista[0] if lista else self.cod_unico).focus_set()
 
     # ------------------------------------------------------------ datos
@@ -229,10 +250,11 @@ class App(tk.Tk):
             self._error_bd(e)
             return
         if p is None:
-            info.configure(text="✗ No existe", foreground="#c62828")
+            info.configure(text="✗ No existe", foreground=tema.ERROR)
         else:
-            info.configure(text=f"{zpl.formatear_precio(p.precio, self.moneda)}   —   {p.nombre}",
-                           foreground="")
+            ref = f"  [{p.referencia}]" if p.referencia else ""
+            info.configure(text=f"{zpl.formatear_precio(p.precio, self.moneda)}   —   {p.nombre}{ref}",
+                           foreground=tema.TEXTO)
 
     def _error_bd(self, e: Exception):
         self.estado.configure(text=f"Error de base de datos: {e}")
@@ -328,8 +350,9 @@ class App(tk.Tk):
         lbl.image = foto
         lbl.pack(padx=8, pady=8)
         total = sum(p.copias for p in productos)
+        win.configure(bg=tema.FONDO)
         ttk.Label(win, text=f"{len(productos)} artículo(s), {total} etiqueta(s) en total. "
-                            "Así se verá impresa.", foreground="#555").pack(pady=(0, 8))
+                            "Así se verá impresa.", style="Ayuda.TLabel").pack(pady=(0, 8))
         win.bind("<Escape>", lambda _e: win.destroy())
 
     def guardar_zpl(self):
@@ -356,19 +379,48 @@ class App(tk.Tk):
         self._aplicar_modo()
 
     def _dialogo_buscar(self, destino: ttk.Entry, info: ttk.Label):
-        """Ventana para buscar un artículo por descripción o código."""
+        """Ventana para buscar un artículo por descripción, código, referencia o modelo."""
+        if str(destino.cget("state")) == "disabled":
+            return
         win = tk.Toplevel(self)
         win.title("Buscar artículo")
+        win.configure(bg=tema.FONDO)
         win.transient(self)
         win.grab_set()
-        texto = ttk.Entry(win, width=50)
-        texto.pack(fill="x", padx=8, pady=8)
-        tabla = ttk.Treeview(win, columns=("codigo", "nombre", "precio"), show="headings", height=15)
-        for col, titulo, ancho in (("codigo", "Código", 130), ("nombre", "Descripción", 360),
-                                   ("precio", "Precio", 100)):
+        tema.colocar_encabezado(win, "Buscar artículo", "Enter buscar  ·  Enter otra vez elegir  ·  Esc salir")
+
+        cuerpo = ttk.Frame(win, padding=10)
+        cuerpo.pack(fill="both", expand=True)
+        campos = ttk.Frame(cuerpo)
+        campos.pack(fill="x")
+        ttk.Label(campos, text="Buscar por:", style="Titulo.TLabel").pack(side="left", padx=(0, 8))
+        disponibles = self.db.columnas_busqueda
+        if disponibles.get(self.campo_busqueda.get()) is None:
+            self.campo_busqueda.set("descripcion")
+        for clave, titulo in CAMPOS_BUSQUEDA.items():
+            activo = disponibles.get(clave) is not None
+            ttk.Radiobutton(campos, text=titulo if activo else f"{titulo} (sin configurar)",
+                            value=clave, variable=self.campo_busqueda,
+                            state="normal" if activo else "disabled",
+                            command=lambda: (ultima.update(texto=None), buscar(), texto.focus_set())
+                            ).pack(side="left", padx=6)
+
+        texto = ttk.Entry(cuerpo, width=60, font=("", 11))
+        texto.pack(fill="x", pady=8)
+        marco = ttk.Frame(cuerpo)
+        marco.pack(fill="both", expand=True)
+        tabla = ttk.Treeview(marco, columns=("codigo", "referencia", "nombre", "precio"),
+                             show="headings", height=15)
+        for col, titulo, ancho in (("codigo", "Código", 120), ("referencia", "Referencia", 140),
+                                   ("nombre", "Descripción", 380), ("precio", "Precio", 100)):
             tabla.heading(col, text=titulo)
             tabla.column(col, width=ancho, anchor="e" if col == "precio" else "w")
-        tabla.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        barra = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
+        tabla.configure(yscrollcommand=barra.set)
+        tabla.pack(side="left", fill="both", expand=True)
+        barra.pack(side="right", fill="y")
+        aviso = ttk.Label(cuerpo, text="", style="Ayuda.TLabel")
+        aviso.pack(fill="x", pady=(6, 0))
 
         ultima = {"texto": None}
 
@@ -379,17 +431,28 @@ class App(tk.Tk):
                 return
             ultima["texto"] = texto.get()
             tabla.delete(*tabla.get_children())
-            if len(texto.get().strip()) < 2:
+            campo = self.campo_busqueda.get()
+            minimo = 1 if campo == "codigo" else 2
+            if len(texto.get().strip()) < minimo:
+                aviso.configure(text=f"Escriba al menos {minimo} letras y pulse Enter.")
                 return
             try:
-                for p in self.db.buscar_descripcion(texto.get()):
-                    self.cache[p.codigo.upper()] = p
-                    tabla.insert("", "end", values=(p.codigo, p.nombre,
-                                                    zpl.formatear_precio(p.precio, self.moneda)))
+                encontrados = self.db.buscar(texto.get(), campo)
+            except ValueError as e:
+                aviso.configure(text=str(e))
+                return
             except Exception as e:  # noqa: BLE001
                 win.destroy()
                 self._error_bd(e)
                 return
+            for p in encontrados:
+                self.cache[p.codigo.upper()] = p
+                tabla.insert("", "end", values=(p.codigo, p.referencia, p.nombre,
+                                                zpl.formatear_precio(p.precio, self.moneda)))
+            n = len(encontrados)
+            aviso.configure(text="No se encontró ningún artículo." if not n else
+                            f"{n} artículo(s)" + (" (se muestran los primeros 200)" if n >= 200 else "")
+                            + ". Enter o doble clic para elegir.")
             hijos = tabla.get_children()
             if hijos:
                 tabla.selection_set(hijos[0])
@@ -411,6 +474,7 @@ class App(tk.Tk):
         tabla.bind("<Return>", elegir)
         win.bind("<Escape>", lambda _e: win.destroy())
         texto.insert(0, destino.get())
+        texto.select_range(0, "end")
         texto.focus_set()
         buscar()
 

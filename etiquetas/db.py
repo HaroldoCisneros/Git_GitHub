@@ -14,6 +14,19 @@ def _col(nombre: str) -> str:
     return ".".join(f"[{parte}]" for parte in nombre.split("."))
 
 
+CAMPOS_BUSQUEDA = {
+    "descripcion": "Descripción",
+    "codigo": "Código",
+    "referencia": "Referencia",
+    "modelo": "Modelo",
+}
+
+
+def _escapar_like(texto: str) -> str:
+    """Que %, _ y [ se busquen tal cual en LIKE de SQL Server."""
+    return texto.replace("[", "[[]").replace("%", "[%]").replace("_", "[_]")
+
+
 class Articulos:
     def __init__(self, cfg):
         self.sql = cfg["sql"]
@@ -25,6 +38,15 @@ class Articulos:
         self.c_barras = _col(t.get("barras", "co_art"))
         ref = (t.get("referencia") or "").strip()
         self.c_ref = _col(ref) if ref else "''"
+        modelo = (t.get("modelo") or "").strip()
+        self.c_modelo = _col(modelo) if modelo else None
+        # columnas por las que se puede buscar (None = no configurada)
+        self.columnas_busqueda = {
+            "descripcion": self.c_desc,
+            "codigo": self.c_codigo,
+            "referencia": _col(ref) if ref else None,
+            "modelo": self.c_modelo,
+        }
 
     def _conectar(self):
         import pymssql  # pip install pymssql
@@ -66,6 +88,31 @@ class Articulos:
         # SQL Server ignora los espacios finales al comparar; se normaliza a mayúsculas
         return {p.codigo.upper(): p for p in encontrados}
 
+    def buscar(self, texto: str, campo: str = "descripcion", limite: int = 200) -> list[Producto]:
+        """Busca artículos que contengan el texto en el campo elegido
+        (descripcion, codigo, referencia o modelo). En la descripción cada palabra
+        se busca por separado: «pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS»."""
+        if campo not in CAMPOS_BUSQUEDA:
+            raise ValueError(f"Campo de búsqueda desconocido: {campo}")
+        columna = self.columnas_busqueda[campo]
+        if columna is None:
+            raise ValueError(f"No está configurada la columna de «{CAMPOS_BUSQUEDA[campo]}». "
+                             "Indíquela en la configuración (Tabla de artículos).")
+        palabras = texto.split() if campo == "descripcion" else [texto.strip()]
+        palabras = [p for p in palabras if p]
+        if not palabras:
+            return []
+        condicion = " AND ".join([f"{columna} LIKE %s"] * len(palabras))
+        # se ordena por posición en el SELECT: co_art puede estar dos veces (código y barras)
+        orden = {"descripcion": "2", "codigo": "1", "referencia": "5"}.get(campo, columna)
+        with self._conectar() as cn, cn.cursor() as cur:
+            cur.execute(
+                f"SELECT TOP {int(limite)} " + self._select()[len("SELECT "):]
+                + f"WHERE {condicion} ORDER BY {orden}",
+                tuple(f"%{_escapar_like(p)}%" for p in palabras),
+            )
+            return [self._producto(f) for f in cur.fetchall()]
+
     def buscar_descripcion(self, texto: str, limite: int = 100) -> list[Producto]:
         """Búsqueda por parte de la descripción o del código."""
         patron = f"%{texto.strip()}%"
@@ -82,5 +129,11 @@ class Articulos:
         with self._conectar() as cn, cn.cursor() as cur:
             cur.execute(self._select().replace("SELECT ", "SELECT TOP 1 ", 1))  # valida las columnas
             cur.fetchall()
+            if self.c_modelo:
+                try:
+                    cur.execute(f"SELECT TOP 1 {self.c_modelo} FROM {self.tabla}")
+                    cur.fetchall()
+                except Exception as e:  # noqa: BLE001
+                    raise ValueError(f"La columna de modelo {self.c_modelo} no existe: {e}") from e
             cur.execute(f"SELECT COUNT(*) FROM {self.tabla}")
             return cur.fetchone()[0]

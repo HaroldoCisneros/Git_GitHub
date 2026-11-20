@@ -15,6 +15,7 @@ import config
 import winprint
 import zpl
 from db import Articulos
+import tema
 from iconos import poner_icono
 
 TIPOS = {
@@ -42,15 +43,18 @@ CAMPOS_SQL = [("servidor", "Servidor"), ("puerto", "Puerto"), ("base_datos", "Ba
 CAMPOS_TABLA = [("nombre", "Tabla"), ("codigo", "Columna código"),
                 ("descripcion", "Columna descripción"), ("precio", "Columna precio"),
                 ("barras", "Columna código de barras"),
-                ("referencia", "Columna referencia (opcional)")]
+                ("referencia", "Columna referencia (opcional)"),
+                ("modelo", "Columna modelo (opcional)")]
 
 
 class Editor(tk.Toplevel):
     def __init__(self, padre, al_guardar=None):
         super().__init__(padre)
-        self.title("Configuración - Etiquetas Zebra")
+        self.title("Configuración - Etiquetas Ferretería Prados")
         poner_icono(self, "logoconfig.bmp")
         self.resizable(False, False)
+        tema.aplicar(self)
+        self.configure(bg=tema.FONDO)
         self.al_guardar = al_guardar
         try:
             self.cfg = config.cargar()
@@ -75,6 +79,7 @@ class Editor(tk.Toplevel):
 
     # ------------------------------------------------------------ interfaz
     def _construir(self):
+        tema.colocar_encabezado(self, "Configuración", "Servidor, impresora y etiqueta")
         cuerpo = ttk.Frame(self, padding=12)
         cuerpo.pack(fill="both", expand=True)
         izq, der = ttk.Frame(cuerpo), ttk.Frame(cuerpo)
@@ -96,7 +101,7 @@ class Editor(tk.Toplevel):
                                 command=lambda: self.ent_clave.configure(show="" if ver.get() else "•")
                                 ).grid(row=i, column=2)
         ttk.Label(f, text="Si SQL Server está en Docker en este equipo: localhost",
-                  foreground="#666").grid(row=len(CAMPOS_SQL), column=0, columnspan=3, sticky="w",
+                  style="Ayuda.TLabel").grid(row=len(CAMPOS_SQL), column=0, columnspan=3, sticky="w",
                                           pady=(4, 0))
 
         # --- Tabla
@@ -124,7 +129,7 @@ class Editor(tk.Toplevel):
         self.cb_destino.grid(row=1, column=1, sticky="w", padx=6)
         self.btn_archivo = ttk.Button(f, text="…", width=3, command=self._boton_destino)
         self.btn_archivo.grid(row=1, column=2)
-        self.lbl_ayuda = ttk.Label(f, text="", foreground="#666")
+        self.lbl_ayuda = ttk.Label(f, text="", style="Ayuda.TLabel")
         self.lbl_ayuda.grid(row=2, column=1, columnspan=2, sticky="w", padx=6)
 
         ttk.Label(f, text="Puerto:").grid(row=3, column=0, sticky="w", pady=2)
@@ -141,7 +146,7 @@ class Editor(tk.Toplevel):
         ttk.Combobox(f, textvariable=imp["velocidad"], width=6,
                      values=["", "2", "3", "4", "5", "6"]).grid(row=6, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Vacío = lo que tenga la impresora. Oscuridad negativa = más claro.",
-                  foreground="#666").grid(row=7, column=1, columnspan=2, sticky="w", padx=6)
+                  style="Ayuda.TLabel").grid(row=7, column=1, columnspan=2, sticky="w", padx=6)
         botones = ttk.Frame(f)
         botones.grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Button(botones, text="Imprimir etiqueta de prueba",
@@ -174,7 +179,7 @@ class Editor(tk.Toplevel):
         ttk.Combobox(f, textvariable=et["reduccion"], values=["0", "1"], state="readonly",
                      width=4).grid(row=7, column=1, sticky="w", padx=6)
         ttk.Label(f, text="1 = barras 1 punto más finas (si la tinta se corre; solo con barra de 2 o 3)",
-                  foreground="#666").grid(row=8, column=1, sticky="w", padx=6)
+                  style="Ayuda.TLabel").grid(row=8, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Logo:").grid(row=3, column=0, sticky="w", pady=2)
         fila = ttk.Frame(f)
         fila.grid(row=3, column=1, sticky="w", padx=6)
@@ -182,14 +187,16 @@ class Editor(tk.Toplevel):
         ttk.Button(fila, text="…", width=3, command=self._elegir_logo).pack(side="left", padx=2)
         ttk.Button(fila, text="✕", width=3, command=lambda: et["logo"].set("")).pack(side="left")
         ttk.Label(f, text="Imagen en blanco y negro (png, jpg, bmp); vacío = sin logo",
-                  foreground="#666").grid(row=4, column=1, sticky="w", padx=6)
+                  style="Ayuda.TLabel").grid(row=4, column=1, sticky="w", padx=6)
 
         # --- Botones
         abajo = ttk.Frame(cuerpo, padding=(0, 12, 0, 0))
         abajo.grid(row=1, column=0, columnspan=2, sticky="ew")
-        ttk.Label(abajo, text=f"Archivo: {config.RUTA}", foreground="#666").pack(side="left")
-        ttk.Button(abajo, text="Guardar", command=self.guardar).pack(side="right")
-        ttk.Button(abajo, text="Cancelar", command=self.destroy).pack(side="right", padx=6)
+        ttk.Label(abajo, text=f"Archivo: {config.RUTA}", style="Ayuda.TLabel").pack(side="left")
+        ttk.Button(abajo, text="Guardar", style="Principal.TButton",
+                   command=self.guardar).pack(side="right")
+        ttk.Button(abajo, text="Cancelar", style="Suave.TButton",
+                   command=self.destroy).pack(side="right", padx=6)
 
     def _tipo(self) -> str:
         nombre = self.cb_tipo.get()

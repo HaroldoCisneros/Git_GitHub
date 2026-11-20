@@ -289,6 +289,37 @@ def test_consulta_sin_referencia():
     assert a._select().strip().endswith("'' FROM [art]")
 
 
+def test_busqueda_sin_columna_configurada():
+    cfg = config.nueva()
+    cfg["tabla"]["referencia"] = ""
+    cfg["tabla"]["modelo"] = ""
+    a = db.Articulos(cfg)
+    assert a.columnas_busqueda["referencia"] is None and a.columnas_busqueda["modelo"] is None
+    with pytest.raises(ValueError):
+        a.buscar("X", "referencia")
+    with pytest.raises(ValueError):
+        a.buscar("X", "campo_que_no_existe")
+
+
+def test_escapar_like():
+    assert db._escapar_like("100%_[a]") == "100[%][_][[]a]"
+
+
+@pytest.mark.skipif(not os.environ.get("ETIQUETAS_SQL"), reason="sin ETIQUETAS_SQL")
+@pytest.mark.parametrize("texto, campo, esperado", [
+    ("pintura gris", "descripcion", "00121008"),      # palabras sueltas, en cualquier orden
+    ("gris pintura", "descripcion", "00121008"),
+    ("0012", "codigo", "00121008"),
+    ("F-050", "referencia", "23329003"),
+    ("PINT-GAL", "modelo", "00121008"),
+    ("100%", "modelo", "369011004"),                  # el % se busca tal cual
+])
+def test_sql_buscar(texto, campo, esperado):
+    a = db.Articulos(config.cargar())
+    codigos = [p.codigo for p in a.buscar(texto, campo)]
+    assert esperado in codigos
+
+
 @pytest.mark.skipif(not os.environ.get("ETIQUETAS_SQL"), reason="sin ETIQUETAS_SQL")
 def test_sql_real():
     a = db.Articulos(config.cargar())

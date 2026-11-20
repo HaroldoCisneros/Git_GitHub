@@ -42,6 +42,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "precio": "prec_vta1",
         "barras": "co_art",
         "referencia": "",       # columna opcional que se imprime en negrita bajo el código
+        "modelo": "modelo",     # columna opcional para buscar por modelo
     },
     "impresora": {
         "tipo": "red",          # red | windows | dispositivo | archivo

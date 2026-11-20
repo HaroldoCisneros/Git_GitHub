@@ -74,8 +74,12 @@ Arriba se puede **cambiar la impresora** antes de imprimir: la primera de la lis
 
 **Vista previa** muestra en pantalla cómo quedarán las etiquetas, tal como se imprimen.
 
-Al pulsar Enter en un código se muestran su precio y su descripción. **Buscar…** (o **F2** en la lista) abre
-una búsqueda por descripción: Enter busca, y un segundo Enter elige el primer resultado.
+Al pulsar Enter en un código se muestran su precio y su descripción.
+
+**F2** (en cualquiera de los dos modos) abre la búsqueda de artículos. Arriba se elige **buscar por**
+Descripción, Código, Referencia o Modelo. En la descripción cada palabra se busca por separado
+(«pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS»). Enter busca, un segundo Enter (o doble
+clic) elige el artículo. Referencia y Modelo usan las columnas indicadas en la configuración.
 **Guardar ZPL…** guarda las etiquetas en un archivo en vez de imprimirlas. **Ctrl+P** imprime.
 
 Las etiquetas se envían en lenguaje **ZPL** (como gráfico `^GFA`). Las impresoras de otras marcas
