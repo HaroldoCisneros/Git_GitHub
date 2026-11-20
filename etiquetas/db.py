@@ -27,6 +27,18 @@ def _escapar_like(texto: str) -> str:
     return texto.replace("[", "[[]").replace("%", "[%]").replace("_", "[_]")
 
 
+def patron_like(texto: str) -> str:
+    """Patrón LIKE que contiene el texto; el * vale por cualquier cantidad de caracteres
+    («PINT*GALON» encuentra «PINTURA ... GALON»)."""
+    partes = [_escapar_like(p) for p in texto.strip().split("*")]
+    return "%" + "%".join(partes) + "%"
+
+
+def letras_reales(texto: str) -> int:
+    """Caracteres del texto sin contar los * ni los espacios."""
+    return len(texto.replace("*", "").replace(" ", ""))
+
+
 class Articulos:
     def __init__(self, cfg):
         self.sql = cfg["sql"]
@@ -91,7 +103,8 @@ class Articulos:
     def buscar(self, texto: str, campo: str = "descripcion", limite: int = 200) -> list[Producto]:
         """Busca artículos que contengan el texto en el campo elegido
         (descripcion, codigo, referencia o modelo). En la descripción cada palabra
-        se busca por separado: «pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS»."""
+        se busca por separado: «pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS».
+        El * vale por cualquier cantidad de caracteres."""
         if campo not in CAMPOS_BUSQUEDA:
             raise ValueError(f"Campo de búsqueda desconocido: {campo}")
         columna = self.columnas_busqueda[campo]
@@ -99,7 +112,9 @@ class Articulos:
             raise ValueError(f"No está configurada la columna de «{CAMPOS_BUSQUEDA[campo]}». "
                              "Indíquela en la configuración (Tabla de artículos).")
         palabras = texto.split() if campo == "descripcion" else [texto.strip()]
-        palabras = [p for p in palabras if p]
+        palabras = [p for p in palabras if p.replace("*", "")]
+        if not palabras and "*" in texto:
+            palabras = ["*"]          # solo «*»: todos los artículos (hasta el límite)
         if not palabras:
             return []
         condicion = " AND ".join([f"{columna} LIKE %s"] * len(palabras))
@@ -109,7 +124,7 @@ class Articulos:
             cur.execute(
                 f"SELECT TOP {int(limite)} " + self._select()[len("SELECT "):]
                 + f"WHERE {condicion} ORDER BY {orden}",
-                tuple(f"%{_escapar_like(p)}%" for p in palabras),
+                tuple(patron_like(p) for p in palabras),
             )
             return [self._producto(f) for f in cur.fetchall()]
 

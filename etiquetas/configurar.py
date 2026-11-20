@@ -115,6 +115,15 @@ class Editor(tk.Toplevel):
         ttk.Button(f, text="Probar conexión", command=self.probar_conexion).grid(
             row=len(CAMPOS_TABLA), column=0, columnspan=2, sticky="w", pady=(8, 0))
 
+        # --- Programa
+        f = ttk.LabelFrame(izq, text=" Programa de etiquetas ", padding=10)
+        f.pack(fill="x", pady=(10, 0))
+        self.boton_config = tk.BooleanVar(value=config.si(self.vars["programa"]["boton_configuracion"].get()))
+        ttk.Checkbutton(f, text="Mostrar el botón «Configuración…» en el programa",
+                        variable=self.boton_config).pack(anchor="w")
+        ttk.Label(f, text="Si se quita, la configuración solo se cambia con ConfigEtiquetas.exe",
+                  style="Ayuda.TLabel").pack(anchor="w", pady=(2, 0))
+
         # --- Impresora
         imp = self.vars["impresora"]
         f = ttk.LabelFrame(der, text=" Impresora ", padding=10)
@@ -254,6 +263,7 @@ class Editor(tk.Toplevel):
     # ------------------------------------------------------------ datos
     def _valores(self) -> config.Config:
         self.vars["etiqueta"]["precio"].set("si" if self.con_precio.get() else "no")
+        self.vars["programa"]["boton_configuracion"].set("si" if self.boton_config.get() else "no")
         self.vars["etiqueta"]["girar"].set("180" if self.girar.get() else "0")
         self.vars["etiqueta"]["barra"].set(
             next((k for k, v in BARRAS.items() if v == self.cb_barra.get()), "0"))

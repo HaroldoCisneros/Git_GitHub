@@ -55,6 +55,8 @@ Si había un `config.ini` de la versión anterior, se convierte a `config.xml` a
   - Archivo `.zpl`: para pruebas.
 
   **Imprimir etiqueta de prueba** manda una etiqueta con los datos que hay en pantalla, sin guardarlos.
+- **Programa de etiquetas:** si se muestra o no el botón **Configuración…** en el programa. Si se
+  quita, la configuración solo se cambia con `ConfigEtiquetas.exe`.
 - **Etiqueta:** formato por defecto, moneda, si se imprime el precio y la imagen del **logo**.
   El logo se convierte solo a blanco y negro y se ajusta al ancho de la etiqueta; conviene una imagen
   en blanco y negro (fondo blanco), sin bordes. Si se pone dentro de la carpeta del programa
@@ -71,7 +73,8 @@ py app.py
 El interruptor de arriba cambia entre los dos modos:
 
 - **Un artículo:** se escribe o escanea el código, se indica la **cantidad** de etiquetas y se pulsa **Imprimir**.
-- **Lista de 10 artículos:** hasta 10 códigos distintos y se imprime una etiqueta de cada uno.
+- **Lista de 20 artículos:** hasta 20 códigos distintos (en dos columnas de 10) y se imprime una
+  etiqueta de cada uno.
   Si algún código no existe, el programa avisa y pregunta si se imprimen los demás.
 
 Arriba se puede **cambiar la impresora** antes de imprimir: la primera de la lista es la de la configuración
@@ -79,11 +82,12 @@ Arriba se puede **cambiar la impresora** antes de imprimir: la primera de la lis
 
 **Vista previa** muestra en pantalla cómo quedarán las etiquetas, tal como se imprimen.
 
-Al pulsar Enter en un código se muestran su precio y su descripción.
+Al pulsar Enter en un código se muestran su descripción y su referencia.
 
 **F2** (en cualquiera de los dos modos) abre la búsqueda de artículos. Arriba se elige **buscar por**
 Descripción, Código, Referencia o Modelo. En la descripción cada palabra se busca por separado
-(«pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS»). Enter busca, un segundo Enter (o doble
+(«pintura gris» encuentra «PINTURA AY-2000 INTERIOR GRIS»). El **`*`** vale por cualquier texto:
+`PINT*GALON`, `0012*8`, `1811*050`; un `*` solo muestra todos (los primeros 200). Enter busca, un segundo Enter (o doble
 clic) elige el artículo. Referencia y Modelo usan las columnas indicadas en la configuración.
 **Guardar ZPL…** guarda las etiquetas en un archivo en vez de imprimirlas. **Ctrl+P** imprime.
 

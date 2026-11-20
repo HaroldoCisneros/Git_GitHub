@@ -61,6 +61,9 @@ DEFECTO: dict[str, dict[str, str]] = {
         "barra": "0",           # grosor de la barra más fina en puntos: 0 = automático, 1, 2, 3
         "reduccion": "0",       # puntos que se le quitan a cada barra (si la tinta se corre)
     },
+    "programa": {
+        "boton_configuracion": "si",   # si | no: mostrar el botón Configuración… en el programa
+    },
 }
 
 
@@ -141,3 +144,7 @@ def opciones(cfg: Config) -> dict:
         oscuridad=_numero(imp["oscuridad"]),
         velocidad=_numero(imp["velocidad"]),
     )
+
+
+def si(valor: str) -> bool:
+    return str(valor).strip().lower() in ("si", "sí", "1", "true")

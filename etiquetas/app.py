@@ -4,7 +4,7 @@ Etiquetas Zebra - ventana para imprimir etiquetas de artículos.
 
 Modos (se cambian con el interruptor):
   * Un artículo: un código y la cantidad de etiquetas.
-  * Lista de 10: hasta 10 códigos distintos, una etiqueta por cada uno.
+  * Lista de 20: hasta 20 códigos distintos, una etiqueta por cada uno.
 
 Ejecutar:  python app.py
 """
@@ -18,10 +18,11 @@ import config
 import tema
 import winprint
 import zpl
-from db import CAMPOS_BUSQUEDA, Articulos
+from db import CAMPOS_BUSQUEDA, Articulos, letras_reales
 from iconos import poner_icono
 
-FILAS_LISTA = 10
+FILAS_LISTA = 20
+FILAS_POR_COLUMNA = 10
 
 
 class Interruptor(tk.Canvas):
@@ -87,8 +88,9 @@ class App(tk.Tk):
         self.cb_imp = ttk.Combobox(arriba, state="readonly", width=34)
         self.cb_imp.pack(side="left", padx=4)
         self._cargar_impresoras()
-        ttk.Button(arriba, text="Configuración…", style="Suave.TButton",
-                   command=self.configurar).pack(side="right")
+        self.btn_config = ttk.Button(arriba, text="Configuración…", style="Suave.TButton",
+                                     command=self.configurar)
+        self._mostrar_boton_config()
 
         sw = ttk.Frame(cuerpo, padding=(0, 12))
         sw.pack(fill="x")
@@ -111,7 +113,7 @@ class App(tk.Tk):
         self.cantidad = ttk.Spinbox(self.marco_unico, from_=1, to=999, width=6)
         self.cantidad.set(1)
         self.cantidad.grid(row=0, column=4, sticky="w", padx=4)
-        self.info_unico = ttk.Label(self.marco_unico, text="", width=70)
+        self.info_unico = ttk.Label(self.marco_unico, text="", width=90)
         self.info_unico.grid(row=1, column=0, columnspan=5, sticky="w", pady=(8, 0))
         self._enlazar(self.cod_unico, self.info_unico)
 
@@ -122,11 +124,14 @@ class App(tk.Tk):
         self.cod_lista: list[ttk.Entry] = []
         self.info_lista: list[ttk.Label] = []
         for i in range(FILAS_LISTA):
-            ttk.Label(self.marco_lista, text=f"{i + 1:>2}.").grid(row=i, column=0, sticky="e")
-            e = ttk.Entry(self.marco_lista, width=22)
-            e.grid(row=i, column=1, padx=4, pady=1)
-            info = ttk.Label(self.marco_lista, text="", width=60)
-            info.grid(row=i, column=2, sticky="w")
+            # dos columnas de 10: 1-10 a la izquierda, 11-20 a la derecha
+            fila, col = i % FILAS_POR_COLUMNA, (i // FILAS_POR_COLUMNA) * 3
+            ttk.Label(self.marco_lista, text=f"{i + 1:>2}.").grid(
+                row=fila, column=col, sticky="e", padx=(12 if col else 0, 0))
+            e = ttk.Entry(self.marco_lista, width=16)
+            e.grid(row=fila, column=col + 1, padx=4, pady=1)
+            info = ttk.Label(self.marco_lista, text="", width=40)
+            info.grid(row=fila, column=col + 2, sticky="w")
             self._enlazar(e, info)
             self.cod_lista.append(e)
             self.info_lista.append(info)
@@ -175,6 +180,13 @@ class App(tk.Tk):
         self.opciones = config.opciones(self.cfg)
         self.cache = {}
 
+    def _mostrar_boton_config(self):
+        """El botón Configuración… se muestra o no según la configuración."""
+        if config.si(self.cfg["programa"]["boton_configuracion"]):
+            self.btn_config.pack(side="right")
+        else:
+            self.btn_config.pack_forget()
+
     def _cargar_impresoras(self):
         """Lista de impresoras para elegir al imprimir: la de la configuración primero
         y luego las instaladas en Windows."""
@@ -201,6 +213,7 @@ class App(tk.Tk):
             self._leer_config()
             self.formato.set(self.cfg["etiqueta"]["formato"])
             self._cargar_impresoras()
+            self._mostrar_boton_config()
             self.estado.configure(text="Configuración actualizada")
 
         Editor(self, al_guardar=al_guardar)
@@ -254,8 +267,7 @@ class App(tk.Tk):
             info.configure(text="✗ No existe", foreground=tema.ERROR)
         else:
             ref = f"  [{p.referencia}]" if p.referencia else ""
-            info.configure(text=f"{zpl.formatear_precio(p.precio, self.moneda)}   —   {p.nombre}{ref}",
-                           foreground=tema.TEXTO)
+            info.configure(text=f"{p.nombre}{ref}", foreground=tema.TEXTO)
 
     def _error_bd(self, e: Exception):
         self.estado.configure(text=f"Error de base de datos: {e}")
@@ -334,7 +346,7 @@ class App(tk.Tk):
             imagen = vista_previa.lamina([
                 zpl.imagen_etiqueta(p, formato, self.dpi, self.moneda, self.logo, self.con_precio,
                                     self.barra, self.reduccion)
-                for p in productos[:10]])
+                for p in productos[:FILAS_LISTA]], maximo=FILAS_LISTA, por_fila=10)
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Vista previa", f"No se pudo generar la vista previa:\n\n{e}")
             return
@@ -389,7 +401,8 @@ class App(tk.Tk):
         win.configure(bg=tema.FONDO)
         win.transient(self)
         win.grab_set()
-        tema.colocar_encabezado(win, "Buscar artículo", "Enter buscar  ·  Enter otra vez elegir  ·  Esc salir")
+        tema.colocar_encabezado(win, "Buscar artículo",
+                                "Enter buscar  ·  Enter otra vez elegir  ·  * cualquier texto  ·  Esc salir")
 
         cuerpo = ttk.Frame(win, padding=10)
         cuerpo.pack(fill="both", expand=True)
@@ -411,12 +424,12 @@ class App(tk.Tk):
         texto.pack(fill="x", pady=8)
         marco = ttk.Frame(cuerpo)
         marco.pack(fill="both", expand=True)
-        tabla = ttk.Treeview(marco, columns=("codigo", "referencia", "nombre", "precio"),
+        tabla = ttk.Treeview(marco, columns=("codigo", "referencia", "nombre"),
                              show="headings", height=15)
-        for col, titulo, ancho in (("codigo", "Código", 120), ("referencia", "Referencia", 140),
-                                   ("nombre", "Descripción", 380), ("precio", "Precio", 100)):
+        for col, titulo, ancho in (("codigo", "Código", 120), ("referencia", "Referencia", 150),
+                                   ("nombre", "Descripción", 450)):
             tabla.heading(col, text=titulo)
-            tabla.column(col, width=ancho, anchor="e" if col == "precio" else "w")
+            tabla.column(col, width=ancho, anchor="w")
         barra = ttk.Scrollbar(marco, orient="vertical", command=tabla.yview)
         tabla.configure(yscrollcommand=barra.set)
         tabla.pack(side="left", fill="both", expand=True)
@@ -435,8 +448,9 @@ class App(tk.Tk):
             tabla.delete(*tabla.get_children())
             campo = self.campo_busqueda.get()
             minimo = 1 if campo == "codigo" else 2
-            if len(texto.get().strip()) < minimo:
-                aviso.configure(text=f"Escriba al menos {minimo} letras y pulse Enter.")
+            if texto.get().strip() != "*" and letras_reales(texto.get()) < minimo:
+                aviso.configure(text=f"Escriba al menos {minimo} letras y pulse Enter. "
+                                     "El * vale por cualquier texto (ej. PINT*GALON).")
                 return
             try:
                 encontrados = self.db.buscar(texto.get(), campo)
@@ -449,8 +463,7 @@ class App(tk.Tk):
                 return
             for p in encontrados:
                 self.cache[p.codigo.upper()] = p
-                tabla.insert("", "end", values=(p.codigo, p.referencia, p.nombre,
-                                                zpl.formatear_precio(p.precio, self.moneda)))
+                tabla.insert("", "end", values=(p.codigo, p.referencia, p.nombre))
             n = len(encontrados)
             aviso.configure(text="No se encontró ningún artículo." if not n else
                             f"{n} artículo(s)" + (" (se muestran los primeros 200)" if n >= 200 else "")

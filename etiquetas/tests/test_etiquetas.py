@@ -301,6 +301,16 @@ def test_busqueda_sin_columna_configurada():
         a.buscar("X", "campo_que_no_existe")
 
 
+@pytest.mark.parametrize("texto, patron", [
+    ("PINT*GALON", "%PINT%GALON%"),
+    ("0012*8", "%0012%8%"),
+    ("100%", "%100[%]%"),
+    ("*", "%%%"),
+])
+def test_patron_con_asterisco(texto, patron):
+    assert db.patron_like(texto) == patron
+
+
 def test_escapar_like():
     assert db._escapar_like("100%_[a]") == "100[%][_][[]a]"
 
@@ -313,6 +323,11 @@ def test_escapar_like():
     ("F-050", "referencia", "23329003"),
     ("PINT-GAL", "modelo", "00121008"),
     ("100%", "modelo", "369011004"),                  # el % se busca tal cual
+    ("PINT*GALON", "descripcion", "00121008"),        # * = cualquier texto
+    ("aqua*mapei", "descripcion", "369011004"),
+    ("0012*8", "codigo", "00121008"),
+    ("1811*050", "referencia", "23329003"),
+    ("*", "codigo", "00121008"),                      # solo * = todos
 ])
 def test_sql_buscar(texto, campo, esperado):
     a = db.Articulos(config.cargar())
