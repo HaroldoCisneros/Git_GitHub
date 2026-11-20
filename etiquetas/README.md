@@ -92,13 +92,23 @@ ese rollo pasa por la impresora con los 3 cm a lo ancho del cabezal. Si sale al 
 etiqueta: 2 puntos (0,25 mm) para códigos de 8 dígitos en la etiqueta de 2,2 cm. Si el lector no lee
 el código, pruebe otro grosor en la configuración.
 
-## Ejecutable (.exe)
+## Ejecutables (.exe)
 
-- **Automático:** cada cambio en `etiquetas/` genera `EtiquetasZebra.exe` en GitHub Actions
+Se generan dos:
+
+| Ejecutable            | Qué es                    | Icono            |
+|-----------------------|---------------------------|------------------|
+| `EtiquetasZebra.exe`  | El programa de etiquetas  | `logoapp.bmp`    |
+| `ConfigEtiquetas.exe` | El editor de `config.xml` | `logoconfig.bmp` |
+
+- **En su PC:** ponga `logoapp.bmp` y `logoconfig.bmp` en la carpeta del proyecto y haga doble clic en
+  **`generar_exe.bat`**. Los `.exe` (y las imágenes) quedan en la carpeta `dist`. Si falta una imagen,
+  ese `.exe` queda sin icono.
+- **Automático:** cada cambio en `etiquetas/` genera los `.exe` en GitHub Actions
   (pestaña *Actions* → *Ejecutable etiquetas Zebra* → *Artifacts*), después de pasar las pruebas en Windows.
-- **En su PC:** doble clic en `generar_exe.bat`; el ejecutable queda en `dist\EtiquetasZebra.exe`.
 
-El `.exe` no necesita Python. `config.xml` y el logo se guardan **junto al .exe**.
+Los `.exe` no necesitan Python. `config.xml`, el logo de la etiqueta y las imágenes de los iconos van
+**junto a los .exe**.
 
 ## Pruebas
 
