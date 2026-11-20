@@ -119,18 +119,21 @@ def modulos_code128(codigo: str) -> int:
     return 11 * len(code128(codigo)) + 13
 
 
-ZONA_LIBRE = 4   # módulos en blanco mínimos a cada lado del código (para el lector)
+ZONA_LIBRE = 4    # módulos en blanco mínimos a cada lado del código
+ZONA_IDEAL = 10   # lo que pide la norma Code 128; el lector lee mejor con este margen
 
 
 def modulo_barras(codigo: str, formato: Formato, dpi: int = 203, barra: int = 0) -> int:
-    """Grosor de la barra más fina en puntos. barra=0: automático (la más gruesa que quepa,
-    hasta 3). Devuelve 0 si el código no cabe."""
+    """Grosor de la barra más fina en puntos. barra=0: automático, la más gruesa (hasta 3)
+    que deje el margen blanco ideal a los lados. Devuelve 0 si el código no cabe."""
     ancho = round(formato.ancho * dpi / 25.4)
     n = modulos_code128(codigo.strip())
-    for m in ([barra] if barra else [3, 2, 1]):
-        if (n + 2 * ZONA_LIBRE) * m <= ancho:
+    if barra:
+        return barra if (n + 2 * ZONA_LIBRE) * barra <= ancho else 0
+    for m in (3, 2, 1):
+        if (n + 2 * ZONA_IDEAL) * m <= ancho:
             return m
-    return 0
+    return 1 if n + 2 * ZONA_LIBRE <= ancho else 0
 
 
 def cabe_barras(codigo: str, formato: Formato, dpi: int = 203, barra: int = 0) -> bool:
@@ -230,7 +233,7 @@ def envolver(dib, texto: str, letra, ancho: int, lineas: int) -> list[str]:
 # ---------------------------------------------------------------- etiqueta
 
 def imagen_etiqueta(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                    logo: str = "", con_precio: bool = False, barra: int = 0):
+                    logo: str = "", con_precio: bool = False, barra: int = 0, reduccion: int = 0):
     """Dibuja la etiqueta derecha (como se lee), a la resolución de la impresora."""
     barras = (p.barras or p.codigo).strip()
     modulo = modulo_barras(barras, formato, dpi, barra)
@@ -239,14 +242,14 @@ def imagen_etiqueta(p: Producto, formato: Formato, dpi: int = 203, moneda: str =
                          f"de {formato.ancho:g} mm de ancho" + (f" con barras de {barra} puntos." if barra else "."))
     # Si no caben al menos 2 líneas de descripción, se achican el logo y las barras
     for escala in (1.0, 0.9, 0.8, 0.7, 0.6):
-        img, caben = _dibujar(p, formato, dpi, moneda, logo, con_precio, escala, modulo)
+        img, caben = _dibujar(p, formato, dpi, moneda, logo, con_precio, escala, modulo, reduccion)
         if caben >= min(2, formato.lineas_nombre):
             break
     return img
 
 
 def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_precio: bool,
-             escala: float, modulo: int):
+             escala: float, modulo: int, reduccion: int = 0):
     from PIL import Image, ImageDraw
 
     pd = dpi / 25.4
@@ -285,7 +288,9 @@ def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_prec
         for k, n in enumerate(patron):
             w = int(n) * modulo
             if k % 2 == 0:
-                dib.rectangle([x, y, x + w - 1, y + alto_b - 1], fill=0)
+                # la tinta se corre: la barra se dibuja más fina (reducción) sin mover las demás
+                fina = max(1, w - reduccion)
+                dib.rectangle([x, y, x + fina - 1, y + alto_b - 1], fill=0)
             x += w
     y += alto_b + d(0.3)
 
@@ -326,14 +331,21 @@ def imagen_a_zpl(img) -> str:
 
 
 def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0) -> str:
-    """ZPL de una etiqueta: la imagen girada según el formato (+ giro extra de la configuración)."""
-    img = imagen_etiqueta(p, formato, dpi, moneda, logo, con_precio, barra)
+                logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0,
+                reduccion: int = 0, oscuridad: int | None = None,
+                velocidad: int | None = None) -> str:
+    """ZPL de una etiqueta: la imagen girada según el formato (+ giro extra de la configuración).
+    oscuridad: ajuste relativo -30..30 (^MD); velocidad: pulgadas por segundo (^PR)."""
+    img = imagen_etiqueta(p, formato, dpi, moneda, logo, con_precio, barra, reduccion)
     rotacion = (formato.rotacion + girar) % 360
     if rotacion:
         img = img.rotate(rotacion, expand=True, fillcolor=255)
+    ajustes = [f"^MD{max(-30, min(30, oscuridad or 0))}"]
+    if velocidad:
+        ajustes.append(f"^PR{velocidad}")
     return "\n".join([
         "^XA",
+        *ajustes,
         f"^PW{img.width}",
         f"^LL{img.height}",
         "^LH0,0",
@@ -344,9 +356,37 @@ def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs
 
 
 def generar_lote(productos, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                 logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0) -> str:
-    return "".join(generar_zpl(p, formato, dpi, moneda, logo, con_precio, girar, barra)
-                   for p in productos)
+                 logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0,
+                 reduccion: int = 0, oscuridad: int | None = None,
+                 velocidad: int | None = None) -> str:
+    return "".join(generar_zpl(p, formato, dpi, moneda, logo, con_precio, girar, barra,
+                               reduccion, oscuridad, velocidad) for p in productos)
+
+
+# Variantes de la hoja de prueba de lectura: (letra, descripción, ajustes)
+VARIANTES_PRUEBA = [
+    ("A", "barra 1 punto", dict(barra=1)),
+    ("B", "barra 1, más claro (-8)", dict(barra=1, oscuridad=-8)),
+    ("C", "barra 1, más claro (-15)", dict(barra=1, oscuridad=-15)),
+    ("D", "barra 2 reducida", dict(barra=2, reduccion=1)),
+    ("E", "barra 2 reducida, más claro (-8)", dict(barra=2, reduccion=1, oscuridad=-8)),
+    ("F", "barra 1, lenta", dict(barra=1, velocidad=2)),
+    ("G", "barra 1, más claro (-8), lenta", dict(barra=1, oscuridad=-8, velocidad=2)),
+]
+
+
+def prueba_lectura(codigo: str, formato: Formato, **opciones) -> tuple[str, list[str]]:
+    """Una etiqueta del mismo código por cada variante, para ver cuál lee el lector.
+    Devuelve (zpl, variantes que no caben)."""
+    dpi = opciones.get("dpi", 203)
+    partes, omitidas = [], []
+    for letra, texto, ajustes in VARIANTES_PRUEBA:
+        if not cabe_barras(codigo, formato, dpi, ajustes.get("barra", 0)):
+            omitidas.append(f"{letra}: {texto}")
+            continue
+        p = Producto(codigo=codigo, nombre=texto, referencia=f"PRUEBA {letra}")
+        partes.append(generar_zpl(p, formato, **{**opciones, **ajustes}))
+    return "".join(partes), omitidas
 
 
 # ---------------------------------------------------------------- envío

@@ -48,6 +48,8 @@ DEFECTO: dict[str, dict[str, str]] = {
         "destino": "192.168.1.50",
         "puerto": "9100",
         "dpi": "203",
+        "oscuridad": "",        # ajuste -30..30 respecto a la impresora; vacío = no cambiar
+        "velocidad": "",        # pulgadas por segundo (2..6); vacío = la de la impresora
     },
     "etiqueta": {
         "formato": "3 x 2,2 cm vertical",
@@ -56,6 +58,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "precio": "no",         # si | no: imprimir el precio
         "girar": "0",           # 0 | 180: girar la etiqueta si sale al revés
         "barra": "0",           # grosor de la barra más fina en puntos: 0 = automático, 1, 2, 3
+        "reduccion": "0",       # puntos que se le quitan a cada barra (si la tinta se corre)
     },
 }
 
@@ -114,3 +117,26 @@ def guardar(cfg: dict, ruta: Path = RUTA) -> None:
             ET.SubElement(nodo, k).text = str(v)
     ET.indent(raiz, space="  ")
     ET.ElementTree(raiz).write(ruta, encoding="utf-8", xml_declaration=True)
+
+
+def _numero(texto: str) -> int | None:
+    try:
+        return int(str(texto).strip())
+    except ValueError:
+        return None
+
+
+def opciones(cfg: Config) -> dict:
+    """Ajustes de impresión de la configuración, listos para zpl.generar_lote(..., **opciones)."""
+    et, imp = cfg["etiqueta"], cfg["impresora"]
+    return dict(
+        dpi=cfg.entero("impresora", "dpi"),
+        moneda=et["moneda"],
+        logo=et["logo"],
+        con_precio=et["precio"].strip().lower() in ("si", "sí", "1", "true"),
+        girar=cfg.entero("etiqueta", "girar"),
+        barra=cfg.entero("etiqueta", "barra"),
+        reduccion=cfg.entero("etiqueta", "reduccion"),
+        oscuridad=_numero(imp["oscuridad"]),
+        velocidad=_numero(imp["velocidad"]),
+    )

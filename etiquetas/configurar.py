@@ -6,9 +6,10 @@ Ejecutar solo:  python configurar.py
 También se abre desde el botón «Configuración…» del programa de etiquetas.
 """
 
+import re
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import config
 import winprint
@@ -132,8 +133,21 @@ class Editor(tk.Toplevel):
         ttk.Label(f, text="Resolución (dpi):").grid(row=4, column=0, sticky="w", pady=2)
         ttk.Combobox(f, textvariable=imp["dpi"], values=["152", "203", "300", "600"],
                      state="readonly", width=6).grid(row=4, column=1, sticky="w", padx=6)
-        ttk.Button(f, text="Imprimir etiqueta de prueba", command=self.imprimir_prueba).grid(
-            row=5, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Label(f, text="Oscuridad:").grid(row=5, column=0, sticky="w", pady=2)
+        ttk.Combobox(f, textvariable=imp["oscuridad"], width=6,
+                     values=["", "-15", "-10", "-8", "-5", "-3", "0", "3", "5"]).grid(
+            row=5, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="Velocidad (pulg./seg.):").grid(row=6, column=0, sticky="w", pady=2)
+        ttk.Combobox(f, textvariable=imp["velocidad"], width=6,
+                     values=["", "2", "3", "4", "5", "6"]).grid(row=6, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="Vacío = lo que tenga la impresora. Oscuridad negativa = más claro.",
+                  foreground="#666").grid(row=7, column=1, columnspan=2, sticky="w", padx=6)
+        botones = ttk.Frame(f)
+        botones.grid(row=8, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Button(botones, text="Imprimir etiqueta de prueba",
+                   command=self.imprimir_prueba).pack(side="left")
+        ttk.Button(botones, text="Hoja de prueba de lectura…",
+                   command=self.prueba_lectura).pack(side="left", padx=6)
 
         # --- Etiqueta
         et = self.vars["etiqueta"]
@@ -156,6 +170,11 @@ class Editor(tk.Toplevel):
         self.cb_barra = ttk.Combobox(f, values=list(BARRAS.values()), state="readonly", width=28)
         self.cb_barra.set(BARRAS.get(et["barra"].get().strip(), BARRAS["0"]))
         self.cb_barra.grid(row=6, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="Reducción de barra:").grid(row=7, column=0, sticky="w", pady=2)
+        ttk.Combobox(f, textvariable=et["reduccion"], values=["0", "1"], state="readonly",
+                     width=4).grid(row=7, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="1 = barras 1 punto más finas (si la tinta se corre; solo con barra de 2 o 3)",
+                  foreground="#666").grid(row=8, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Logo:").grid(row=3, column=0, sticky="w", pady=2)
         fila = ttk.Frame(f)
         fila.grid(row=3, column=1, sticky="w", padx=6)
@@ -238,6 +257,11 @@ class Editor(tk.Toplevel):
                              ("impresora", "puerto", "Puerto de la impresora")):
             if not cfg[s][k].isdigit():
                 return f"«{titulo}» debe ser un número."
+        for k, titulo, minimo, maximo in (("oscuridad", "Oscuridad", -30, 30),
+                                          ("velocidad", "Velocidad", 1, 14)):
+            valor = cfg["impresora"][k]
+            if valor and not (re.fullmatch(r"[+-]?\d+", valor) and minimo <= int(valor) <= maximo):
+                return f"«{titulo}» debe estar vacío o ser un número entre {minimo} y {maximo}."
         for s, k, titulo in (("sql", "servidor", "Servidor"), ("sql", "base_datos", "Base de datos"),
                              ("impresora", "destino", "Destino de la impresora")):
             if not cfg[s][k]:
@@ -270,22 +294,57 @@ class Editor(tk.Toplevel):
         finally:
             self.configure(cursor="")
 
-    def imprimir_prueba(self):
-        cfg = self._valores()
+    def _enviar(self, cfg, texto: str, mensaje: str):
         imp = cfg["impresora"]
-        et = cfg["etiqueta"]
-        p = zpl.Producto(codigo="1234567890", nombre="ETIQUETA DE PRUEBA DESCRIPCION DEL ARTICULO",
-                         precio=1234.56, referencia="REF-0001")
         try:
-            texto = zpl.generar_zpl(p, zpl.FORMATOS[et["formato"]], cfg.entero("impresora", "dpi"),
-                                    et["moneda"], et["logo"], et["precio"] == "si",
-                                    cfg.entero("etiqueta", "girar"), cfg.entero("etiqueta", "barra"))
             zpl.enviar(texto, imp["tipo"], imp["destino"], cfg.entero("impresora", "puerto"))
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Impresora", f"No se pudo imprimir:\n\n{e}", parent=self)
         else:
-            messagebox.showinfo("Impresora", f"Etiqueta de prueba enviada a {imp['destino']}.",
-                                parent=self)
+            messagebox.showinfo("Impresora", mensaje, parent=self)
+
+    def imprimir_prueba(self):
+        cfg = self._valores()
+        if error := self._validar(cfg):
+            messagebox.showwarning("Configuración", error, parent=self)
+            return
+        p = zpl.Producto(codigo="00121008", nombre="ETIQUETA DE PRUEBA DESCRIPCION DEL ARTICULO",
+                         precio=1234.56, referencia="REF-0001")
+        try:
+            texto = zpl.generar_zpl(p, zpl.FORMATOS[cfg["etiqueta"]["formato"]], **config.opciones(cfg))
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Impresora", f"No se pudo generar la etiqueta:\n\n{e}", parent=self)
+            return
+        self._enviar(cfg, texto, f"Etiqueta de prueba enviada a {cfg['impresora']['destino']}.")
+
+    def prueba_lectura(self):
+        """Imprime el mismo código con varios ajustes (A, B, C...) para ver cuál lee el lector."""
+        cfg = self._valores()
+        if error := self._validar(cfg):
+            messagebox.showwarning("Configuración", error, parent=self)
+            return
+        codigo = simpledialog.askstring(
+            "Hoja de prueba de lectura",
+            "Código de un artículo para la prueba\n(se imprime una etiqueta por cada ajuste):",
+            initialvalue="00121008", parent=self)
+        if not codigo or not codigo.strip():
+            return
+        opciones = config.opciones(cfg)
+        for clave in ("barra", "reduccion", "oscuridad", "velocidad"):
+            opciones.pop(clave)
+        try:
+            texto, omitidas = zpl.prueba_lectura(codigo.strip(), zpl.FORMATOS[cfg["etiqueta"]["formato"]],
+                                                 **opciones)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Prueba", f"No se pudo generar la prueba:\n\n{e}", parent=self)
+            return
+        lista = "\n".join(f"  {letra}: {txt}" for letra, txt, aj in zpl.VARIANTES_PRUEBA
+                          if f"{letra}: {txt}" not in omitidas)
+        aviso = ("\n\nNo caben con este código:\n  " + "\n  ".join(omitidas)) if omitidas else ""
+        self._enviar(cfg, texto,
+                     f"Se enviaron {texto.count('^XA')} etiquetas. Cada una dice PRUEBA y una letra:\n\n"
+                     f"{lista}{aviso}\n\nPase el lector por cada una y ponga en la configuración "
+                     "el grosor, la reducción, la oscuridad y la velocidad de la que lea mejor.")
 
     def guardar(self):
         cfg = self._valores()

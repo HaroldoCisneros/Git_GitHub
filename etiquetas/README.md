@@ -88,9 +88,16 @@ punto) y se envía como un gráfico ZPL. En el formato `3 x 2,2 cm vertical` la 
 ese rollo pasa por la impresora con los 3 cm a lo ancho del cabezal. Si sale al revés, marque
 **Girar 180°** en la configuración. La vista previa es exactamente lo que se imprime.
 
-**Grosor de barra:** por defecto (automático) se usa la barra más gruesa que quepa a lo ancho de la
-etiqueta: 2 puntos (0,25 mm) para códigos de 8 dígitos en la etiqueta de 2,2 cm. Si el lector no lee
-el código, pruebe otro grosor en la configuración.
+### Si el lector no lee el código de barras
+
+En el editor de configuración, **Hoja de prueba de lectura…** imprime el mismo código con varios ajustes
+(PRUEBA A, B, C…): grosor de barra, reducción de barra, oscuridad y velocidad. Pase el lector por cada
+una y deje en la configuración los ajustes de la que lea mejor:
+
+- **Grosor de barra:** automático deja el margen blanco que pide la norma a los lados del código.
+- **Reducción de barra:** quita 1 punto a cada barra (si la tinta se corre); solo con barra de 2 o 3.
+- **Oscuridad:** ajuste respecto a la impresora (`^MD`); negativo = más claro. Vacío = no cambia.
+- **Velocidad:** pulgadas por segundo (`^PR`); más lenta suele marcar mejor. Vacío = no cambia.
 
 ## Ejecutables (.exe)
 

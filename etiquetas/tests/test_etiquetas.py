@@ -142,15 +142,46 @@ def test_descripcion_larga_se_corta():
     assert all(dib.textlength(f, font=letra) <= 150 for f in palabra)
 
 
-@pytest.mark.parametrize("codigo", ["00121008", "23329003"])
-def test_barras_gruesas_en_etiqueta_pequena(codigo):
-    """Los códigos de 8 dígitos llevan barras de 2 puntos (1 punto no lo leen muchos lectores)."""
+@pytest.mark.parametrize("codigo", ["00121008", "23329003", "369011004"])
+def test_margen_blanco_del_codigo(codigo):
+    """En automático el código deja el margen blanco de la norma (10 módulos) a cada lado."""
     f = zpl.FORMATOS["3 x 2,2 cm vertical"]
-    assert zpl.modulo_barras(codigo, f) == 2
+    m = zpl.modulo_barras(codigo, f)
+    ancho = round(f.ancho * 203 / 25.4)
+    assert (zpl.modulos_code128(codigo) + 2 * zpl.ZONA_IDEAL) * m <= ancho
     img = zpl.imagen_etiqueta(zpl.Producto(codigo, "PINTURA"), f)
     leido = leer_barras(img)
     if leido is not None:
         assert leido == codigo
+
+
+def test_reduccion_de_barra():
+    f = zpl.FORMATOS["3 x 2,2 cm vertical"]
+    p = zpl.Producto("00121008", "X")
+    normal = zpl.imagen_etiqueta(p, f, barra=2)
+    fina = zpl.imagen_etiqueta(p, f, barra=2, reduccion=1)
+    negros = lambda img: sum(1 for v in img.getdata() if v == 0)  # noqa: E731
+    assert negros(fina) < negros(normal)
+    leido = leer_barras(fina)
+    if leido is not None:
+        assert leido == "00121008"
+
+
+def test_oscuridad_y_velocidad():
+    f = zpl.FORMATOS["3 x 2,2 cm vertical"]
+    p = zpl.Producto("00121008", "X")
+    assert "^MD0" in zpl.generar_zpl(p, f) and "^PR" not in zpl.generar_zpl(p, f)
+    texto = zpl.generar_zpl(p, f, oscuridad=-8, velocidad=2)
+    assert "^MD-8" in texto and "^PR2" in texto
+    assert "^MD-30" in zpl.generar_zpl(p, f, oscuridad=-99)
+
+
+def test_hoja_prueba_lectura():
+    f = zpl.FORMATOS["3 x 2,2 cm vertical"]
+    texto, omitidas = zpl.prueba_lectura("00121008", f)
+    assert texto.count("^XA") == len(zpl.VARIANTES_PRUEBA) and not omitidas
+    texto, omitidas = zpl.prueba_lectura("369011004", f)     # 9 dígitos: barra 2 no cabe
+    assert omitidas and texto.count("^XA") == len(zpl.VARIANTES_PRUEBA) - len(omitidas)
 
 
 def test_grosor_forzado():

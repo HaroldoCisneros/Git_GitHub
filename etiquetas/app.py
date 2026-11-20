@@ -151,6 +151,8 @@ class App(tk.Tk):
         self.con_precio = self.cfg["etiqueta"]["precio"].lower() in ("si", "sí", "1", "true")
         self.girar = self.cfg.entero("etiqueta", "girar")
         self.barra = self.cfg.entero("etiqueta", "barra")
+        self.reduccion = self.cfg.entero("etiqueta", "reduccion")
+        self.opciones = config.opciones(self.cfg)
         self.cache = {}
 
     def _cargar_impresoras(self):
@@ -280,8 +282,7 @@ class App(tk.Tk):
         return productos
 
     def _zpl(self, productos) -> str:
-        return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], self.dpi, self.moneda,
-                                self.logo, self.con_precio, self.girar, self.barra)
+        return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], **self.opciones)
 
     # ------------------------------------------------------------ acciones
     def imprimir(self):
@@ -309,7 +310,7 @@ class App(tk.Tk):
             formato = zpl.FORMATOS[self.formato.get()]
             imagen = vista_previa.lamina([
                 zpl.imagen_etiqueta(p, formato, self.dpi, self.moneda, self.logo, self.con_precio,
-                                    self.barra)
+                                    self.barra, self.reduccion)
                 for p in productos[:10]])
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Vista previa", f"No se pudo generar la vista previa:\n\n{e}")
