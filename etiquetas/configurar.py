@@ -71,6 +71,7 @@ class Editor(tk.Toplevel):
         }
         self._construir()
         self._cambio_tipo()
+        tema.centrar(self, padre)
         if padre.winfo_viewable():
             self.transient(padre)
         self.grab_set()

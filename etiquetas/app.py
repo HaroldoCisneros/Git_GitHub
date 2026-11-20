@@ -69,6 +69,7 @@ class App(tk.Tk):
 
         self._construir()
         self._aplicar_modo()
+        tema.centrar(self)
         self.cod_unico.focus_set()
 
     # ------------------------------------------------------------ interfaz
@@ -354,6 +355,7 @@ class App(tk.Tk):
         ttk.Label(win, text=f"{len(productos)} artículo(s), {total} etiqueta(s) en total. "
                             "Así se verá impresa.", style="Ayuda.TLabel").pack(pady=(0, 8))
         win.bind("<Escape>", lambda _e: win.destroy())
+        tema.centrar(win, self)
 
     def guardar_zpl(self):
         productos = self._productos()
@@ -475,6 +477,7 @@ class App(tk.Tk):
         win.bind("<Escape>", lambda _e: win.destroy())
         texto.insert(0, destino.get())
         texto.select_range(0, "end")
+        tema.centrar(win, self)
         texto.focus_set()
         buscar()
 

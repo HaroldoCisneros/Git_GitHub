@@ -108,3 +108,21 @@ def colocar_encabezado(padre: tk.Misc, titulo: str, subtitulo: str = "") -> None
     linea.pack(fill="x", side="top")
     for color in (AZUL, VERDE, AMARILLO, ROJO, AZUL):
         tk.Frame(linea, bg=color, height=4).pack(side="left", fill="both", expand=True)
+
+
+def centrar(ventana: tk.Toplevel | tk.Tk, padre: tk.Misc | None = None) -> None:
+    """Coloca la ventana centrada sobre el padre (o en la pantalla si no hay padre visible)."""
+    ventana.update_idletasks()
+    w = max(ventana.winfo_width(), ventana.winfo_reqwidth())
+    h = max(ventana.winfo_height(), ventana.winfo_reqheight())
+    if padre is not None and padre.winfo_viewable():
+        padre = padre.winfo_toplevel()
+        x = padre.winfo_rootx() + (padre.winfo_width() - w) // 2
+        y = padre.winfo_rooty() + (padre.winfo_height() - h) // 2
+    else:
+        x = (ventana.winfo_screenwidth() - w) // 2
+        y = (ventana.winfo_screenheight() - h) // 3
+    # que no se salga de la pantalla
+    x = max(0, min(x, ventana.winfo_screenwidth() - w))
+    y = max(0, min(y, ventana.winfo_screenheight() - h - 40))
+    ventana.geometry(f"+{x}+{y}")
