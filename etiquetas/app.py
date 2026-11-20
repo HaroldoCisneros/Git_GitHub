@@ -18,6 +18,7 @@ import zpl
 import config
 import winprint
 from db import Articulos
+from iconos import poner_icono
 
 FILAS_LISTA = 10
 
@@ -53,6 +54,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Etiquetas Zebra")
+        poner_icono(self, "logoapp.bmp")
         self.resizable(False, False)
 
         self._leer_config()
@@ -148,6 +150,7 @@ class App(tk.Tk):
         self.logo = self.cfg["etiqueta"]["logo"]
         self.con_precio = self.cfg["etiqueta"]["precio"].lower() in ("si", "sí", "1", "true")
         self.girar = self.cfg.entero("etiqueta", "girar")
+        self.barra = self.cfg.entero("etiqueta", "barra")
         self.cache = {}
 
     def _cargar_impresoras(self):
@@ -258,7 +261,7 @@ class App(tk.Tk):
         formato = zpl.FORMATOS[self.formato.get()]
         faltan = [c for c, p in resultado.items() if p is None]
         largos = [c for c, p in resultado.items()
-                  if p is not None and not zpl.cabe_barras(p.barras or p.codigo, formato, self.dpi)]
+                  if p is not None and not zpl.cabe_barras(p.barras or p.codigo, formato, self.dpi, self.barra)]
         productos = [zpl.Producto(**{**p.__dict__, "copias": copias})
                      for c in codigos if (p := resultado[c]) is not None and c not in largos]
         if faltan or largos:
@@ -278,7 +281,7 @@ class App(tk.Tk):
 
     def _zpl(self, productos) -> str:
         return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], self.dpi, self.moneda,
-                                self.logo, self.con_precio, self.girar)
+                                self.logo, self.con_precio, self.girar, self.barra)
 
     # ------------------------------------------------------------ acciones
     def imprimir(self):
@@ -305,7 +308,8 @@ class App(tk.Tk):
             import vista_previa
             formato = zpl.FORMATOS[self.formato.get()]
             imagen = vista_previa.lamina([
-                zpl.imagen_etiqueta(p, formato, self.dpi, self.moneda, self.logo, self.con_precio)
+                zpl.imagen_etiqueta(p, formato, self.dpi, self.moneda, self.logo, self.con_precio,
+                                    self.barra)
                 for p in productos[:10]])
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Vista previa", f"No se pudo generar la vista previa:\n\n{e}")

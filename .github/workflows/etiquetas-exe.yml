@@ -36,24 +36,28 @@ jobs:
         env:
           ETIQUETAS_IMPRESORA: Zebra Prueba
           ETIQUETAS_SALIDA: C:\prueba\salida.prn
-        run: python -m pytest tests -v
+        run: python -m pytest tests -v -rs
 
       - name: Lista de impresoras que ve el programa
         run: python winprint.py
 
-      - name: Generar EtiquetasZebra.exe
+      - name: Generar EtiquetasZebra.exe y ConfigEtiquetas.exe
         run: python -m PyInstaller --noconfirm --clean EtiquetasZebra.spec
 
-      - name: Comprobar que el ejecutable arranca
+      - name: Comprobar que los ejecutables arrancan
         shell: pwsh
         run: |
-          $p = Start-Process dist\EtiquetasZebra.exe -PassThru
-          Start-Sleep -Seconds 20
-          if ($p.HasExited) { throw "El ejecutable se cerró al arrancar (código $($p.ExitCode))" }
-          Stop-Process $p
-          Get-Item dist\EtiquetasZebra.exe | Format-List Name, Length
+          foreach ($exe in "EtiquetasZebra", "ConfigEtiquetas") {
+            $p = Start-Process "dist\$exe.exe" -PassThru
+            Start-Sleep -Seconds 20
+            if ($p.HasExited) { throw "$exe.exe se cerró al arrancar (código $($p.ExitCode))" }
+            Stop-Process $p
+          }
+          Get-ChildItem dist | Format-Table Name, Length
+          if (Test-Path logoapp.bmp) { Copy-Item logoapp.bmp dist\ }
+          if (Test-Path logoconfig.bmp) { Copy-Item logoconfig.bmp dist\ }
 
       - uses: actions/upload-artifact@v4
         with:
           name: EtiquetasZebra
-          path: etiquetas/dist/EtiquetasZebra.exe
+          path: etiquetas/dist/*

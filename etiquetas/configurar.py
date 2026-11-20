@@ -14,6 +14,7 @@ import config
 import winprint
 import zpl
 from db import Articulos
+from iconos import poner_icono
 
 TIPOS = {
     "red": "Zebra en red (IP)",
@@ -28,6 +29,13 @@ AYUDA_DESTINO = {
     "archivo": "Ruta del archivo donde se guardan las etiquetas",
 }
 
+BARRAS = {
+    "0": "Automático (la más gruesa que quepa)",
+    "1": "1 punto (0,125 mm) - muy fina",
+    "2": "2 puntos (0,25 mm)",
+    "3": "3 puntos (0,375 mm)",
+}
+
 CAMPOS_SQL = [("servidor", "Servidor"), ("puerto", "Puerto"), ("base_datos", "Base de datos"),
               ("usuario", "Usuario"), ("clave", "Clave"), ("timeout", "Espera (seg.)")]
 CAMPOS_TABLA = [("nombre", "Tabla"), ("codigo", "Columna código"),
@@ -40,6 +48,7 @@ class Editor(tk.Toplevel):
     def __init__(self, padre, al_guardar=None):
         super().__init__(padre)
         self.title("Configuración - Etiquetas Zebra")
+        poner_icono(self, "logoconfig.bmp")
         self.resizable(False, False)
         self.al_guardar = al_guardar
         try:
@@ -143,6 +152,10 @@ class Editor(tk.Toplevel):
         self.girar = tk.BooleanVar(value=et["girar"].get().strip() == "180")
         ttk.Checkbutton(f, text="Girar 180° (si la etiqueta sale al revés)",
                         variable=self.girar).grid(row=5, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="Grosor de barra:").grid(row=6, column=0, sticky="w", pady=2)
+        self.cb_barra = ttk.Combobox(f, values=list(BARRAS.values()), state="readonly", width=28)
+        self.cb_barra.set(BARRAS.get(et["barra"].get().strip(), BARRAS["0"]))
+        self.cb_barra.grid(row=6, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Logo:").grid(row=3, column=0, sticky="w", pady=2)
         fila = ttk.Frame(f)
         fila.grid(row=3, column=1, sticky="w", padx=6)
@@ -215,6 +228,8 @@ class Editor(tk.Toplevel):
     def _valores(self) -> config.Config:
         self.vars["etiqueta"]["precio"].set("si" if self.con_precio.get() else "no")
         self.vars["etiqueta"]["girar"].set("180" if self.girar.get() else "0")
+        self.vars["etiqueta"]["barra"].set(
+            next((k for k, v in BARRAS.items() if v == self.cb_barra.get()), "0"))
         return config.Config({s: {k: v.get().strip() for k, v in vs.items()}
                               for s, vs in self.vars.items()})
 
@@ -264,7 +279,7 @@ class Editor(tk.Toplevel):
         try:
             texto = zpl.generar_zpl(p, zpl.FORMATOS[et["formato"]], cfg.entero("impresora", "dpi"),
                                     et["moneda"], et["logo"], et["precio"] == "si",
-                                    cfg.entero("etiqueta", "girar"))
+                                    cfg.entero("etiqueta", "girar"), cfg.entero("etiqueta", "barra"))
             zpl.enviar(texto, imp["tipo"], imp["destino"], cfg.entero("impresora", "puerto"))
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Impresora", f"No se pudo imprimir:\n\n{e}", parent=self)

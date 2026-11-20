@@ -142,6 +142,25 @@ def test_descripcion_larga_se_corta():
     assert all(dib.textlength(f, font=letra) <= 150 for f in palabra)
 
 
+@pytest.mark.parametrize("codigo", ["00121008", "23329003"])
+def test_barras_gruesas_en_etiqueta_pequena(codigo):
+    """Los códigos de 8 dígitos llevan barras de 2 puntos (1 punto no lo leen muchos lectores)."""
+    f = zpl.FORMATOS["3 x 2,2 cm vertical"]
+    assert zpl.modulo_barras(codigo, f) == 2
+    img = zpl.imagen_etiqueta(zpl.Producto(codigo, "PINTURA"), f)
+    leido = leer_barras(img)
+    if leido is not None:
+        assert leido == codigo
+
+
+def test_grosor_forzado():
+    f = zpl.FORMATOS["3 x 2,2 cm vertical"]
+    assert zpl.modulo_barras("23329003", f, barra=1) == 1
+    assert zpl.modulo_barras("23329003", f, barra=3) == 0
+    with pytest.raises(ValueError):
+        zpl.imagen_etiqueta(zpl.Producto("23329003", "X"), f, barra=3)
+
+
 def test_codigo_demasiado_largo():
     f = zpl.FORMATOS["3 x 2,2 cm vertical"]
     assert not zpl.cabe_barras("ABC-12345-XYZ", f)

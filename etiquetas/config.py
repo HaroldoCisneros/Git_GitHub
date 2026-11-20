@@ -55,6 +55,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "logo": "",             # imagen del logo (png, jpg, bmp); vacío = sin logo
         "precio": "no",         # si | no: imprimir el precio
         "girar": "0",           # 0 | 180: girar la etiqueta si sale al revés
+        "barra": "0",           # grosor de la barra más fina en puntos: 0 = automático, 1, 2, 3
     },
 }
 

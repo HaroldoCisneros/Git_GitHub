@@ -88,6 +88,10 @@ punto) y se envía como un gráfico ZPL. En el formato `3 x 2,2 cm vertical` la 
 ese rollo pasa por la impresora con los 3 cm a lo ancho del cabezal. Si sale al revés, marque
 **Girar 180°** en la configuración. La vista previa es exactamente lo que se imprime.
 
+**Grosor de barra:** por defecto (automático) se usa la barra más gruesa que quepa a lo ancho de la
+etiqueta: 2 puntos (0,25 mm) para códigos de 8 dígitos en la etiqueta de 2,2 cm. Si el lector no lee
+el código, pruebe otro grosor en la configuración.
+
 ## Ejecutable (.exe)
 
 - **Automático:** cada cambio en `etiquetas/` genera `EtiquetasZebra.exe` en GitHub Actions

@@ -119,11 +119,23 @@ def modulos_code128(codigo: str) -> int:
     return 11 * len(code128(codigo)) + 13
 
 
-def cabe_barras(codigo: str, formato: Formato, dpi: int = 203) -> bool:
-    """True si el código de barras cabe en el ancho útil de la etiqueta."""
-    pd = dpi / 25.4
-    util = round(formato.ancho * pd) - 2 * round(formato.margen * pd)
-    return modulos_code128(codigo.strip()) <= util
+ZONA_LIBRE = 4   # módulos en blanco mínimos a cada lado del código (para el lector)
+
+
+def modulo_barras(codigo: str, formato: Formato, dpi: int = 203, barra: int = 0) -> int:
+    """Grosor de la barra más fina en puntos. barra=0: automático (la más gruesa que quepa,
+    hasta 3). Devuelve 0 si el código no cabe."""
+    ancho = round(formato.ancho * dpi / 25.4)
+    n = modulos_code128(codigo.strip())
+    for m in ([barra] if barra else [3, 2, 1]):
+        if (n + 2 * ZONA_LIBRE) * m <= ancho:
+            return m
+    return 0
+
+
+def cabe_barras(codigo: str, formato: Formato, dpi: int = 203, barra: int = 0) -> bool:
+    """True si el código de barras cabe a lo ancho de la etiqueta."""
+    return modulo_barras(codigo, formato, dpi, barra) > 0
 
 
 # ---------------------------------------------------------------- logo
@@ -218,22 +230,23 @@ def envolver(dib, texto: str, letra, ancho: int, lineas: int) -> list[str]:
 # ---------------------------------------------------------------- etiqueta
 
 def imagen_etiqueta(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                    logo: str = "", con_precio: bool = False):
+                    logo: str = "", con_precio: bool = False, barra: int = 0):
     """Dibuja la etiqueta derecha (como se lee), a la resolución de la impresora."""
     barras = (p.barras or p.codigo).strip()
-    if not cabe_barras(barras, formato, dpi):
+    modulo = modulo_barras(barras, formato, dpi, barra)
+    if not modulo:
         raise ValueError(f"El código «{barras}» es demasiado largo para la etiqueta "
-                         f"de {formato.ancho:g} mm de ancho.")
+                         f"de {formato.ancho:g} mm de ancho" + (f" con barras de {barra} puntos." if barra else "."))
     # Si no caben al menos 2 líneas de descripción, se achican el logo y las barras
     for escala in (1.0, 0.9, 0.8, 0.7, 0.6):
-        img, caben = _dibujar(p, formato, dpi, moneda, logo, con_precio, escala)
+        img, caben = _dibujar(p, formato, dpi, moneda, logo, con_precio, escala, modulo)
         if caben >= min(2, formato.lineas_nombre):
             break
     return img
 
 
 def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_precio: bool,
-             escala: float):
+             escala: float, modulo: int):
     from PIL import Image, ImageDraw
 
     pd = dpi / 25.4
@@ -266,7 +279,6 @@ def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_prec
     # Código de barras Code 128, punto por punto
     barras = (p.barras or p.codigo).strip()
     modulos = modulos_code128(barras)
-    modulo = max(1, min(3, util // modulos))
     alto_b = d(f.alto_barras * max(escala, 0.75))
     x = (ancho - modulos * modulo) // 2
     for patron in [C128[s] for s in code128(barras)] + [C128_PARADA]:
@@ -314,9 +326,9 @@ def imagen_a_zpl(img) -> str:
 
 
 def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                logo: str = "", con_precio: bool = False, girar: int = 0) -> str:
+                logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0) -> str:
     """ZPL de una etiqueta: la imagen girada según el formato (+ giro extra de la configuración)."""
-    img = imagen_etiqueta(p, formato, dpi, moneda, logo, con_precio)
+    img = imagen_etiqueta(p, formato, dpi, moneda, logo, con_precio, barra)
     rotacion = (formato.rotacion + girar) % 360
     if rotacion:
         img = img.rotate(rotacion, expand=True, fillcolor=255)
@@ -332,8 +344,9 @@ def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs
 
 
 def generar_lote(productos, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
-                 logo: str = "", con_precio: bool = False, girar: int = 0) -> str:
-    return "".join(generar_zpl(p, formato, dpi, moneda, logo, con_precio, girar) for p in productos)
+                 logo: str = "", con_precio: bool = False, girar: int = 0, barra: int = 0) -> str:
+    return "".join(generar_zpl(p, formato, dpi, moneda, logo, con_precio, girar, barra)
+                   for p in productos)
 
 
 # ---------------------------------------------------------------- envío
