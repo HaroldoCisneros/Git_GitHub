@@ -14,14 +14,16 @@ Cada etiqueta lleva **descripción**, **precio** y **código de barras Code 128*
 
 Los formatos se definen en `zpl.py` (`FORMATOS`). Para agregar uno basta con copiar una entrada y cambiar las medidas.
 
-## Instalación
+## Instalación (Windows)
+
+1. Instalar Python 3.10 o superior desde https://www.python.org/downloads/ marcando **"Add python.exe to PATH"**.
+2. Doble clic en **`instalar.bat`**: instala las dependencias y crea `config.ini`.
+3. Doble clic en **`iniciar.bat`** para abrir el programa.
+
+A mano, desde la carpeta del proyecto (si `pip` "no se reconoce", use `py -m pip`):
 
 ```bash
-pip install -r requirements.txt
-```
-
-```bash
-cp config.ini.ejemplo config.ini
+py -m pip install -r requirements.txt
 ```
 
 En `config.ini` se indican el servidor SQL, la tabla/columnas y la impresora:
@@ -36,7 +38,7 @@ En `config.ini` se indican el servidor SQL, la tabla/columnas y la impresora:
 ## Uso
 
 ```bash
-python app.py
+py app.py
 ```
 
 El interruptor de arriba cambia entre los dos modos:
