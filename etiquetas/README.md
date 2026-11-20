@@ -8,10 +8,15 @@ código, la **referencia** en negrita (opcional), el **precio** (opcional) y la 
 
 ## Formatos
 
-| Formato                 | Tamaño (ancho × alto)  |
-|-------------------------|------------------------|
-| `3 x 2,2 cm vertical`   | 22 × 30 mm             |
-| `5 x 2,5 cm horizontal` | 50 × 25 mm             |
+El primer número es lo que mide la etiqueta **a lo ancho del cabezal**; el segundo, el largo en el
+sentido en que avanza el papel. Todos los verticales tienen el mismo diseño.
+
+| Formato                 | Diseño (ancho × alto) | En la impresora              |
+|-------------------------|-----------------------|------------------------------|
+| `3 x 2,2 cm vertical`   | 22 × 30 mm            | girada 90° (30 mm de ancho)  |
+| `4 x 3 cm vertical`     | 30 × 40 mm            | girada 90° (40 mm de ancho)  |
+| `5 x 8 cm vertical`     | 50 × 80 mm            | derecha (50 mm de ancho)     |
+| `5 x 2,5 cm horizontal` | 50 × 25 mm            | derecha (50 mm de ancho)     |
 
 Los formatos se definen en `zpl.py` (`FORMATOS`). Para agregar uno basta con copiar una entrada y cambiar las medidas.
 

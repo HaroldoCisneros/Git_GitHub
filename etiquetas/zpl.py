@@ -55,6 +55,20 @@ FORMATOS: dict[str, Formato] = {
         letra_ref=2.2, letra_precio=3.2, letra_nombre=2.3, lineas_nombre=4,
         rotacion=90,
     ),
+    # Mismo diseño que el de 3 x 2,2. El primer número es lo que mide la etiqueta a lo
+    # ancho del cabezal; el segundo, el largo en el sentido en que avanza el papel.
+    "4 x 3 cm vertical": Formato(
+        ancho=30, alto=40, margen=1.5,
+        alto_logo=5.5, alto_barras=12, letra_codigo=2.4,
+        letra_ref=3.2, letra_precio=4.2, letra_nombre=3.2, lineas_nombre=5, espacio=0.9,
+        rotacion=90,
+    ),
+    "5 x 8 cm vertical": Formato(
+        ancho=50, alto=80, margen=2.5,
+        alto_logo=13, alto_barras=24, letra_codigo=3.6,
+        letra_ref=5.2, letra_precio=7, letra_nombre=5.4, lineas_nombre=6, espacio=2,
+        rotacion=0,
+    ),
     "5 x 2,5 cm horizontal": Formato(
         ancho=50, alto=25, margen=1.5,
         alto_logo=3.5, alto_barras=6, letra_codigo=1.8,
@@ -300,24 +314,40 @@ def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_prec
     if con_precio:
         y += linea(formatear_precio(p.precio, moneda), f.letra_precio, True) + esp // 2
 
-    # Descripción: las líneas que quepan en lo que queda. Si no cabe completa,
-    # se prueba con letra un poco más pequeña (hasta un 80 %).
+    # Descripción: las líneas que quepan en lo que queda. Si no cabe completa o hay que
+    # partir una palabra, se prueba con letra más pequeña (hasta un 70 %).
     texto = " ".join(p.nombre.split())
     base = d(f.letra_nombre)
-    for tam in range(base, max(6, round(base * 0.8)) - 1, -1):
+    for tam in range(base, max(6, round(base * 0.7)) - 1, -1):
         letra = fuente(tam, False)
         sube, baja = letra.getmetrics()
         alto_linea = round((sube + baja) * 0.95)
         caben = (alto - m - y) // alto_linea
         lineas = max(1, min(f.lineas_nombre + (base - tam > 0), caben))
         filas = envolver(dib, texto, letra, util, 99)
-        if len(filas) <= lineas:
+        enteras = all(dib.textlength(w, font=letra) <= util for w in texto.split())
+        if len(filas) <= lineas and enteras:
             break
     filas = envolver(dib, texto, letra, util, lineas)
     for fila in filas:
         dib.text((ancho / 2, y + sube), fila, font=letra, fill=0, anchor="ms")  # sobre la línea base
         y += alto_linea
-    return img, caben
+    return _centrar_vertical(img, m), caben
+
+
+def _centrar_vertical(img, margen: int):
+    """Reparte el espacio que sobra abajo entre arriba y abajo."""
+    from PIL import Image, ImageOps
+
+    caja = ImageOps.invert(img).getbbox()
+    if not caja:
+        return img
+    sobra = (img.height - margen) - caja[3]
+    if sobra < 4:
+        return img
+    nueva = Image.new("L", img.size, 255)
+    nueva.paste(img.crop((0, 0, img.width, caja[3])), (0, sobra // 2))
+    return nueva
 
 
 def imagen_a_zpl(img) -> str:
