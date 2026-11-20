@@ -51,7 +51,7 @@ class Formato:
 FORMATOS: dict[str, Formato] = {
     "3 x 2,2 cm vertical": Formato(
         ancho=22, alto=30, margen=1.2,
-        alto_logo=4.5, alto_barras=8, letra_codigo=1.8,
+        alto_logo=3.5, alto_barras=9.5, letra_codigo=1.8,
         letra_ref=2.2, letra_precio=3.2, letra_nombre=2.3, lineas_nombre=4,
         rotacion=90,
     ),
@@ -282,7 +282,7 @@ def _dibujar(p: Producto, f: Formato, dpi: int, moneda: str, logo: str, con_prec
     # Código de barras Code 128, punto por punto
     barras = (p.barras or p.codigo).strip()
     modulos = modulos_code128(barras)
-    alto_b = d(f.alto_barras * max(escala, 0.75))
+    alto_b = d(f.alto_barras * max(escala, 0.9))   # el código casi no se achica (el lector)
     x = (ancho - modulos * modulo) // 2
     for patron in [C128[s] for s in code128(barras)] + [C128_PARADA]:
         for k, n in enumerate(patron):
