@@ -230,6 +230,14 @@ def test_vista_previa(logo):
 
 # ------------------------------------------------------------- configuración
 
+def test_oscuridad_predeterminada():
+    """La PRUEBA B (barra 1 punto, oscuridad -8) es la que lee el lector."""
+    op = config.opciones(config.nueva())
+    assert op["oscuridad"] == -8 and op["barra"] == 0 and op["velocidad"] is None
+    texto = zpl.generar_zpl(zpl.Producto("00121008", "X"), zpl.FORMATOS["3 x 2,2 cm vertical"], **op)
+    assert "^MD-8" in texto
+
+
 def test_config_ida_y_vuelta(tmp_path):
     cfg = config.nueva()
     cfg["sql"]["clave"] = "cl@ve<&>"

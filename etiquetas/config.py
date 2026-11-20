@@ -48,7 +48,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "destino": "192.168.1.50",
         "puerto": "9100",
         "dpi": "203",
-        "oscuridad": "",        # ajuste -30..30 respecto a la impresora; vacío = no cambiar
+        "oscuridad": "-8",      # ajuste -30..30 respecto a la impresora (-8: probado en PRUEBA B)
         "velocidad": "",        # pulgadas por segundo (2..6); vacío = la de la impresora
     },
     "etiqueta": {
