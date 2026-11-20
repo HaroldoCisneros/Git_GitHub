@@ -13,9 +13,9 @@ if not defined PY (
 %PY% --version
 %PY% -m pip install --upgrade pip
 %PY% -m pip install -r requirements.txt || (echo. & echo ERROR al instalar. & pause & exit /b 1)
-if not exist config.ini (
-  copy config.ini.ejemplo config.ini >nul
-  echo Se creo config.ini: abralo y ponga los datos del servidor SQL y de la impresora.
+if not exist config.xml (
+  echo Abriendo la configuracion...
+  %PY% configurar.py
 )
 echo.
 echo Listo. Para abrir el programa use iniciar.bat

@@ -1,35 +1,21 @@
 """Lectura de artículos desde la tabla de SQL Server (por defecto: art de Profit)."""
 
-import configparser
 import re
-from pathlib import Path
 
 from zpl import Producto
 
-CARPETA = Path(__file__).resolve().parent
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$")
-
-
-def cargar_config(ruta: Path | None = None) -> configparser.ConfigParser:
-    ruta = ruta or CARPETA / "config.ini"
-    if not ruta.exists():
-        raise FileNotFoundError(
-            f"No existe {ruta}. Copie config.ini.ejemplo como config.ini y ajuste los datos."
-        )
-    cfg = configparser.ConfigParser()
-    cfg.read(ruta, encoding="utf-8")
-    return cfg
 
 
 def _col(nombre: str) -> str:
     """Valida un nombre de tabla/columna y lo devuelve entre corchetes."""
     if not _IDENT.match(nombre):
-        raise ValueError(f"Nombre de tabla o columna no válido en config.ini: {nombre!r}")
+        raise ValueError(f"Nombre de tabla o columna no válido en la configuración: {nombre!r}")
     return ".".join(f"[{parte}]" for parte in nombre.split("."))
 
 
 class Articulos:
-    def __init__(self, cfg: configparser.ConfigParser):
+    def __init__(self, cfg):
         self.sql = cfg["sql"]
         t = cfg["tabla"]
         self.tabla = _col(t.get("nombre", "art"))
@@ -43,11 +29,11 @@ class Articulos:
 
         return pymssql.connect(
             server=self.sql.get("servidor", "localhost"),
-            port=self.sql.get("puerto", "1433"),
+            port=str(self.sql.get("puerto") or "1433"),
             database=self.sql.get("base_datos"),
             user=self.sql.get("usuario"),
             password=self.sql.get("clave"),
-            login_timeout=self.sql.getint("timeout", 5),
+            login_timeout=int(self.sql.get("timeout") or 5),
             charset="UTF-8",
         )
 
@@ -87,3 +73,11 @@ class Articulos:
                 (patron, patron),
             )
             return [self._producto(f) for f in cur.fetchall()]
+
+    def probar(self) -> int:
+        """Prueba la conexión y devuelve cuántos registros tiene la tabla."""
+        with self._conectar() as cn, cn.cursor() as cur:
+            cur.execute(self._select().replace("SELECT ", "SELECT TOP 1 ", 1))  # valida las columnas
+            cur.fetchall()
+            cur.execute(f"SELECT COUNT(*) FROM {self.tabla}")
+            return cur.fetchone()[0]

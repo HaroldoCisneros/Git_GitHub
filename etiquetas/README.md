@@ -17,7 +17,7 @@ Los formatos se definen en `zpl.py` (`FORMATOS`). Para agregar uno basta con cop
 ## Instalación (Windows)
 
 1. Instalar Python 3.10 o superior desde https://www.python.org/downloads/ marcando **"Add python.exe to PATH"**.
-2. Doble clic en **`instalar.bat`**: instala las dependencias y crea `config.ini`.
+2. Doble clic en **`instalar.bat`**: instala las dependencias y abre la configuración.
 3. Doble clic en **`iniciar.bat`** para abrir el programa.
 
 A mano, desde la carpeta del proyecto (si `pip` "no se reconoce", use `py -m pip`):
@@ -26,14 +26,31 @@ A mano, desde la carpeta del proyecto (si `pip` "no se reconoce", use `py -m pip
 py -m pip install -r requirements.txt
 ```
 
-En `config.ini` se indican el servidor SQL, la tabla/columnas y la impresora:
+## Configuración (`config.xml`)
 
-- **SQL en Docker en el mismo equipo:** `servidor = localhost` y el puerto publicado del contenedor (normalmente `1433`).
-- **Impresora**, según `tipo`:
-  - `red`: `destino` es la IP de la Zebra (puerto 9100).
-  - `windows`: `destino` es el nombre de la impresora instalada en Windows (requiere `pip install pywin32`).
-  - `dispositivo`: `/dev/usb/lp0` en Linux o `\\PC-CAJA\Zebra` si está compartida.
-  - `archivo`: guarda el ZPL en un archivo (para pruebas).
+Toda la configuración se guarda en `config.xml` y se edita con su propia ventana:
+
+```bash
+py configurar.py
+```
+
+También se abre con el botón **Configuración…** del programa, y sola la primera vez si no existe `config.xml`.
+Si había un `config.ini` de la versión anterior, se convierte a `config.xml` automáticamente.
+
+- **Servidor SQL:** servidor, puerto, base de datos, usuario y clave. Si SQL Server está en Docker en el
+  mismo equipo, el servidor es `localhost` y el puerto el publicado por el contenedor (normalmente `1433`).
+- **Tabla de artículos:** tabla y columnas (por defecto `art`, `co_art`, `art_des`, `prec_vta1`; el código
+  de barras es `co_art`). El botón **Probar conexión** comprueba la conexión y las columnas.
+- **Impresora**, según la conexión:
+  - Zebra en red: la IP (puerto 9100).
+  - Instalada en Windows: el nombre de la impresora; con `pywin32` instalado aparece la lista para elegir.
+  - Dispositivo / compartida: `\\PC-CAJA\Zebra` o `/dev/usb/lp0`.
+  - Archivo `.zpl`: para pruebas.
+
+  **Imprimir etiqueta de prueba** manda una etiqueta con los datos que hay en pantalla, sin guardarlos.
+- **Etiqueta:** formato por defecto y moneda.
+
+`config.xml` contiene la clave de SQL, por eso no se sube a git.
 
 ## Uso
 

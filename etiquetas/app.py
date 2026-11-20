@@ -13,7 +13,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import zpl
-from db import Articulos, cargar_config
+import config
+from db import Articulos
 
 FILAS_LISTA = 10
 
@@ -51,19 +52,10 @@ class App(tk.Tk):
         self.title("Etiquetas Zebra")
         self.resizable(False, False)
 
-        self.cfg = cargar_config()
-        self.db = Articulos(self.cfg)
-        imp = self.cfg["impresora"]
-        self.imp_tipo = imp.get("tipo", "red")
-        self.imp_destino = imp.get("destino", "")
-        self.imp_puerto = imp.getint("puerto", 9100)
-        self.dpi = imp.getint("dpi", 203)
-        et = self.cfg["etiqueta"] if self.cfg.has_section("etiqueta") else {}
-        self.moneda = et.get("moneda", "Bs.")
+        self._leer_config()
 
-        self.cache: dict[str, zpl.Producto | None] = {}
         self.modo_lista = tk.BooleanVar(value=False)
-        self.formato = tk.StringVar(value=et.get("formato", next(iter(zpl.FORMATOS))))
+        self.formato = tk.StringVar(value=self.cfg["etiqueta"]["formato"])
         if self.formato.get() not in zpl.FORMATOS:
             self.formato.set(next(iter(zpl.FORMATOS)))
 
@@ -81,8 +73,9 @@ class App(tk.Tk):
         ttk.Label(arriba, text="Formato:").pack(side="left")
         ttk.Combobox(arriba, textvariable=self.formato, values=list(zpl.FORMATOS),
                      state="readonly", width=24).pack(side="left", padx=(4, 16))
-        ttk.Label(arriba, text=f"Impresora: {self.imp_tipo} → {self.imp_destino}",
-                  foreground="#555").pack(side="left")
+        self.lbl_imp = ttk.Label(arriba, text=self._texto_impresora(), foreground="#555")
+        self.lbl_imp.pack(side="left")
+        ttk.Button(arriba, text="Configuración…", command=self.configurar).pack(side="right")
 
         sw = ttk.Frame(cuerpo, padding=(0, 12))
         sw.pack(fill="x")
@@ -136,6 +129,31 @@ class App(tk.Tk):
         self.estado = ttk.Label(self, text="Listo", relief="sunken", anchor="w", padding=(6, 2))
         self.estado.pack(fill="x", side="bottom")
         self.bind("<Control-p>", lambda _e: self.imprimir())
+
+    def _leer_config(self):
+        self.cfg = config.cargar()
+        self.db = Articulos(self.cfg)
+        imp = self.cfg["impresora"]
+        self.imp_tipo = imp["tipo"]
+        self.imp_destino = imp["destino"]
+        self.imp_puerto = self.cfg.entero("impresora", "puerto")
+        self.dpi = self.cfg.entero("impresora", "dpi")
+        self.moneda = self.cfg["etiqueta"]["moneda"]
+        self.cache = {}
+
+    def _texto_impresora(self) -> str:
+        return f"Impresora: {self.imp_tipo} → {self.imp_destino}"
+
+    def configurar(self):
+        from configurar import Editor
+
+        def al_guardar():
+            self._leer_config()
+            self.formato.set(self.cfg["etiqueta"]["formato"])
+            self.lbl_imp.configure(text=self._texto_impresora())
+            self.estado.configure(text="Configuración actualizada")
+
+        Editor(self, al_guardar=al_guardar)
 
     def _enlazar(self, entrada: ttk.Entry, info: ttk.Label):
         entrada.bind("<Return>", lambda _e: (self._mostrar(entrada, info), self._siguiente(entrada)))
@@ -327,6 +345,12 @@ class App(tk.Tk):
 
 
 def main():
+    if not config.existe() and not config.RUTA.with_suffix(".ini").exists():
+        # Primera vez: se abre el editor de configuración
+        from configurar import abrir_solo
+
+        if not abrir_solo():
+            return
     try:
         app = App()
     except Exception as e:  # noqa: BLE001
