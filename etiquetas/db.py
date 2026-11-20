@@ -23,6 +23,8 @@ class Articulos:
         self.c_desc = _col(t.get("descripcion", "art_des"))
         self.c_precio = _col(t.get("precio", "prec_vta1"))
         self.c_barras = _col(t.get("barras", "co_art"))
+        ref = (t.get("referencia") or "").strip()
+        self.c_ref = _col(ref) if ref else "''"
 
     def _conectar(self):
         import pymssql  # pip install pymssql
@@ -38,17 +40,18 @@ class Articulos:
         )
 
     def _select(self) -> str:
-        return (f"SELECT {self.c_codigo}, {self.c_desc}, {self.c_precio}, {self.c_barras} "
+        return (f"SELECT {self.c_codigo}, {self.c_desc}, {self.c_precio}, {self.c_barras}, {self.c_ref} "
                 f"FROM {self.tabla} ")
 
     @staticmethod
     def _producto(fila) -> Producto:
-        codigo, desc, precio, barras = fila
+        codigo, desc, precio, barras, ref = fila
         return Producto(
             codigo=str(codigo or "").strip(),
             nombre=str(desc or "").strip(),
             precio=float(precio or 0),
             barras=str(barras or "").strip(),
+            referencia=str(ref or "").strip(),
         )
 
     def buscar_codigos(self, codigos: list[str]) -> dict[str, Producto]:

@@ -38,6 +38,7 @@ DEFECTO: dict[str, dict[str, str]] = {
         "descripcion": "art_des",
         "precio": "prec_vta1",
         "barras": "co_art",
+        "referencia": "",       # columna opcional que se imprime en negrita bajo el código
     },
     "impresora": {
         "tipo": "red",          # red | windows | dispositivo | archivo
@@ -48,6 +49,8 @@ DEFECTO: dict[str, dict[str, str]] = {
     "etiqueta": {
         "formato": "3 x 2,2 cm vertical",
         "moneda": "Bs.",
+        "logo": "",             # imagen del logo (png, jpg, bmp); vacío = sin logo
+        "precio": "no",         # si | no: imprimir el precio
     },
 }
 

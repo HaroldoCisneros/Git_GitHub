@@ -3,7 +3,8 @@
 Programa para imprimir etiquetas de artículos en impresoras Zebra (ZPL), leyendo
 los artículos de la tabla `art` de SQL Server (Profit), aunque el servidor esté en un contenedor Docker.
 
-Cada etiqueta lleva **descripción**, **precio** y **código de barras Code 128**.
+Cada etiqueta lleva, de arriba hacia abajo: **logo**, **código de barras Code 128** (con `co_art`), el número del
+código, la **referencia** en negrita (opcional), el **precio** (opcional) y la **descripción**.
 
 ## Formatos
 
@@ -49,7 +50,10 @@ Si había un `config.ini` de la versión anterior, se convierte a `config.xml` a
   - Archivo `.zpl`: para pruebas.
 
   **Imprimir etiqueta de prueba** manda una etiqueta con los datos que hay en pantalla, sin guardarlos.
-- **Etiqueta:** formato por defecto y moneda.
+- **Etiqueta:** formato por defecto, moneda, si se imprime el precio y la imagen del **logo**.
+  El logo se convierte solo a blanco y negro y se ajusta al ancho de la etiqueta; conviene una imagen
+  en blanco y negro (fondo blanco), sin bordes. Si se pone dentro de la carpeta del programa
+  (por ejemplo `logo.png`), se guarda la ruta relativa.
 
 `config.xml` contiene la clave de SQL, por eso no se sube a git.
 
@@ -65,11 +69,17 @@ El interruptor de arriba cambia entre los dos modos:
 - **Lista de 10 artículos:** hasta 10 códigos distintos y se imprime una etiqueta de cada uno.
   Si algún código no existe, el programa avisa y pregunta si se imprimen los demás.
 
+Arriba se puede **cambiar la impresora** antes de imprimir: la primera de la lista es la de la configuración
+(predeterminada) y después aparecen todas las impresoras instaladas en Windows (por ejemplo, una 3nStar).
+
+**Vista previa** muestra en pantalla cómo quedarán las etiquetas (la letra es aproximada).
+
 Al pulsar Enter en un código se muestran su precio y su descripción. **Buscar…** (o **F2** en la lista) abre
 una búsqueda por descripción: Enter busca, y un segundo Enter elige el primer resultado.
 **Guardar ZPL…** guarda las etiquetas en un archivo en vez de imprimirlas. **Ctrl+P** imprime.
 
-Para ver cómo queda un `.zpl` sin gastar etiquetas, se puede pegar en https://labelary.com/viewer.html
+Las etiquetas se envían en lenguaje **ZPL**. Las impresoras de otras marcas (como 3nStar) deben tener
+activada la emulación ZPL.
 
 ## Línea de comandos (opcional)
 

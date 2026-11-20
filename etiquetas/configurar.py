@@ -7,6 +7,7 @@ También se abre desde el botón «Configuración…» del programa de etiquetas
 """
 
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import config
@@ -31,7 +32,8 @@ CAMPOS_SQL = [("servidor", "Servidor"), ("puerto", "Puerto"), ("base_datos", "Ba
               ("usuario", "Usuario"), ("clave", "Clave"), ("timeout", "Espera (seg.)")]
 CAMPOS_TABLA = [("nombre", "Tabla"), ("codigo", "Columna código"),
                 ("descripcion", "Columna descripción"), ("precio", "Columna precio"),
-                ("barras", "Columna código de barras")]
+                ("barras", "Columna código de barras"),
+                ("referencia", "Columna referencia (opcional)")]
 
 
 class Editor(tk.Toplevel):
@@ -135,6 +137,17 @@ class Editor(tk.Toplevel):
                      width=24).grid(row=0, column=1, sticky="w", padx=6)
         ttk.Label(f, text="Moneda:").grid(row=1, column=0, sticky="w", pady=2)
         ttk.Entry(f, textvariable=et["moneda"], width=8).grid(row=1, column=1, sticky="w", padx=6)
+        self.con_precio = tk.BooleanVar(value=et["precio"].get().lower() in ("si", "sí", "1", "true"))
+        ttk.Checkbutton(f, text="Imprimir el precio", variable=self.con_precio).grid(
+            row=2, column=1, sticky="w", padx=6)
+        ttk.Label(f, text="Logo:").grid(row=3, column=0, sticky="w", pady=2)
+        fila = ttk.Frame(f)
+        fila.grid(row=3, column=1, sticky="w", padx=6)
+        ttk.Entry(fila, textvariable=et["logo"], width=28).pack(side="left")
+        ttk.Button(fila, text="…", width=3, command=self._elegir_logo).pack(side="left", padx=2)
+        ttk.Button(fila, text="✕", width=3, command=lambda: et["logo"].set("")).pack(side="left")
+        ttk.Label(f, text="Imagen en blanco y negro (png, jpg, bmp); vacío = sin logo",
+                  foreground="#666").grid(row=4, column=1, sticky="w", padx=6)
 
         # --- Botones
         abajo = ttk.Frame(cuerpo, padding=(0, 12, 0, 0))
@@ -179,6 +192,16 @@ class Editor(tk.Toplevel):
         else:
             self._elegir_archivo()
 
+    def _elegir_logo(self):
+        ruta = filedialog.askopenfilename(parent=self, title="Imagen del logo", filetypes=[
+            ("Imágenes", "*.png *.jpg *.jpeg *.bmp *.gif"), ("Todos", "*.*")])
+        if ruta:
+            try:  # si está dentro de la carpeta del programa se guarda la ruta relativa
+                ruta = str(Path(ruta).resolve().relative_to(zpl.CARPETA))
+            except ValueError:
+                pass
+            self.vars["etiqueta"]["logo"].set(ruta)
+
     def _elegir_archivo(self):
         ruta = filedialog.asksaveasfilename(parent=self, defaultextension=".zpl",
                                             filetypes=[("ZPL", "*.zpl"), ("Todos", "*.*")])
@@ -187,6 +210,7 @@ class Editor(tk.Toplevel):
 
     # ------------------------------------------------------------ datos
     def _valores(self) -> config.Config:
+        self.vars["etiqueta"]["precio"].set("si" if self.con_precio.get() else "no")
         return config.Config({s: {k: v.get().strip() for k, v in vs.items()}
                               for s, vs in self.vars.items()})
 
@@ -199,6 +223,9 @@ class Editor(tk.Toplevel):
                              ("impresora", "destino", "Destino de la impresora")):
             if not cfg[s][k]:
                 return f"Falta «{titulo}»."
+        logo = zpl.ruta_logo(cfg["etiqueta"]["logo"])
+        if logo and not logo.exists():
+            return f"No se encuentra la imagen del logo:\n{logo}"
         try:
             Articulos(cfg)  # valida nombres de tabla y columnas
         except ValueError as e:
@@ -227,10 +254,12 @@ class Editor(tk.Toplevel):
     def imprimir_prueba(self):
         cfg = self._valores()
         imp = cfg["impresora"]
-        p = zpl.Producto(codigo="1234567890", nombre="ETIQUETA DE PRUEBA", precio=1234.56)
-        texto = zpl.generar_zpl(p, zpl.FORMATOS[cfg["etiqueta"]["formato"]],
-                                cfg.entero("impresora", "dpi"), cfg["etiqueta"]["moneda"])
+        et = cfg["etiqueta"]
+        p = zpl.Producto(codigo="1234567890", nombre="ETIQUETA DE PRUEBA DESCRIPCION DEL ARTICULO",
+                         precio=1234.56, referencia="REF-0001")
         try:
+            texto = zpl.generar_zpl(p, zpl.FORMATOS[et["formato"]], cfg.entero("impresora", "dpi"),
+                                    et["moneda"], et["logo"], et["precio"] == "si")
             zpl.enviar(texto, imp["tipo"], imp["destino"], cfg.entero("impresora", "puerto"))
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Impresora", f"No se pudo imprimir:\n\n{e}", parent=self)

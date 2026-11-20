@@ -9,11 +9,14 @@ Modos (se cambian con el interruptor):
 Ejecutar:  python app.py
 """
 
+import base64
+import io
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import zpl
 import config
+import winprint
 from db import Articulos
 
 FILAS_LISTA = 10
@@ -73,8 +76,10 @@ class App(tk.Tk):
         ttk.Label(arriba, text="Formato:").pack(side="left")
         ttk.Combobox(arriba, textvariable=self.formato, values=list(zpl.FORMATOS),
                      state="readonly", width=24).pack(side="left", padx=(4, 16))
-        self.lbl_imp = ttk.Label(arriba, text=self._texto_impresora(), foreground="#555")
-        self.lbl_imp.pack(side="left")
+        ttk.Label(arriba, text="Impresora:").pack(side="left")
+        self.cb_imp = ttk.Combobox(arriba, state="readonly", width=34)
+        self.cb_imp.pack(side="left", padx=4)
+        self._cargar_impresoras()
         ttk.Button(arriba, text="Configuración…", command=self.configurar).pack(side="right")
 
         sw = ttk.Frame(cuerpo, padding=(0, 12))
@@ -124,6 +129,7 @@ class App(tk.Tk):
         abajo.pack(fill="x")
         ttk.Button(abajo, text="Imprimir", command=self.imprimir).pack(side="right")
         ttk.Button(abajo, text="Guardar ZPL…", command=self.guardar_zpl).pack(side="right", padx=6)
+        ttk.Button(abajo, text="Vista previa", command=self.vista_previa).pack(side="right")
         ttk.Button(abajo, text="Limpiar", command=self.limpiar).pack(side="left")
 
         self.estado = ttk.Label(self, text="Listo", relief="sunken", anchor="w", padding=(6, 2))
@@ -139,10 +145,28 @@ class App(tk.Tk):
         self.imp_puerto = self.cfg.entero("impresora", "puerto")
         self.dpi = self.cfg.entero("impresora", "dpi")
         self.moneda = self.cfg["etiqueta"]["moneda"]
+        self.logo = self.cfg["etiqueta"]["logo"]
+        self.con_precio = self.cfg["etiqueta"]["precio"].lower() in ("si", "sí", "1", "true")
         self.cache = {}
 
-    def _texto_impresora(self) -> str:
-        return f"Impresora: {self.imp_tipo} → {self.imp_destino}"
+    def _cargar_impresoras(self):
+        """Lista de impresoras para elegir al imprimir: la de la configuración primero
+        y luego las instaladas en Windows."""
+        self.impresoras: dict[str, tuple[str, str]] = {}
+        principal = f"{self.imp_destino}  (predeterminada)"
+        self.impresoras[principal] = (self.imp_tipo, self.imp_destino)
+        try:
+            instaladas = winprint.impresoras()
+        except OSError:
+            instaladas = []
+        for nombre in instaladas:
+            if not (self.imp_tipo == "windows" and nombre == self.imp_destino):
+                self.impresoras[nombre] = ("windows", nombre)
+        self.cb_imp.configure(values=list(self.impresoras))
+        self.cb_imp.set(principal)
+
+    def _impresora(self) -> tuple[str, str]:
+        return self.impresoras.get(self.cb_imp.get(), (self.imp_tipo, self.imp_destino))
 
     def configurar(self):
         from configurar import Editor
@@ -150,7 +174,7 @@ class App(tk.Tk):
         def al_guardar():
             self._leer_config()
             self.formato.set(self.cfg["etiqueta"]["formato"])
-            self.lbl_imp.configure(text=self._texto_impresora())
+            self._cargar_impresoras()
             self.estado.configure(text="Configuración actualizada")
 
         Editor(self, al_guardar=al_guardar)
@@ -243,7 +267,8 @@ class App(tk.Tk):
         return productos
 
     def _zpl(self, productos) -> str:
-        return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], self.dpi, self.moneda)
+        return zpl.generar_lote(productos, zpl.FORMATOS[self.formato.get()], self.dpi, self.moneda,
+                                self.logo, self.con_precio)
 
     # ------------------------------------------------------------ acciones
     def imprimir(self):
@@ -251,15 +276,44 @@ class App(tk.Tk):
         if not productos:
             return
         total = sum(p.copias for p in productos)
+        tipo, destino = self._impresora()
         self.estado.configure(text="Enviando a la impresora…")
         self.update_idletasks()
         try:
-            zpl.enviar(self._zpl(productos), self.imp_tipo, self.imp_destino, self.imp_puerto)
+            zpl.enviar(self._zpl(productos), tipo, destino, self.imp_puerto)
         except Exception as e:  # noqa: BLE001
             self.estado.configure(text=f"Error al imprimir: {e}")
-            messagebox.showerror("Impresora", f"No se pudo imprimir en {self.imp_destino}:\n\n{e}")
+            messagebox.showerror("Impresora", f"No se pudo imprimir en {destino}:\n\n{e}")
             return
-        self.estado.configure(text=f"Enviadas {total} etiqueta(s) a {self.imp_destino}")
+        self.estado.configure(text=f"Enviadas {total} etiqueta(s) a {destino}")
+
+    def vista_previa(self):
+        productos = self._productos()
+        if not productos:
+            return
+        try:
+            import vista_previa
+            imagen = vista_previa.lamina(self._zpl([zpl.Producto(**{**p.__dict__, "copias": 1})
+                                                    for p in productos]))
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Vista previa", f"No se pudo generar la vista previa:\n\n{e}")
+            return
+        maximo = (self.winfo_screenwidth() - 80, self.winfo_screenheight() - 160)
+        if imagen.width > maximo[0] or imagen.height > maximo[1]:
+            imagen.thumbnail(maximo)
+        win = tk.Toplevel(self)
+        win.title("Vista previa (aproximada)")
+        win.transient(self)
+        buffer = io.BytesIO()
+        imagen.save(buffer, format="PNG")
+        foto = tk.PhotoImage(data=base64.b64encode(buffer.getvalue()))
+        lbl = ttk.Label(win, image=foto)
+        lbl.image = foto
+        lbl.pack(padx=8, pady=8)
+        total = sum(p.copias for p in productos)
+        ttk.Label(win, text=f"{len(productos)} artículo(s), {total} etiqueta(s) en total. "
+                            "La letra es aproximada.", foreground="#555").pack(pady=(0, 8))
+        win.bind("<Escape>", lambda _e: win.destroy())
 
     def guardar_zpl(self):
         productos = self._productos()

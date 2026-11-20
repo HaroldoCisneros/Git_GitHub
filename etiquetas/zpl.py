@@ -7,39 +7,50 @@ según los DPI de la impresora.
 
 import socket
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+
+CARPETA = Path(__file__).resolve().parent
 
 
 @dataclass
 class Producto:
-    codigo: str          # código del artículo
-    nombre: str          # descripción
-    precio: float | str
-    barras: str = ""     # contenido del código de barras (si está vacío se usa el código)
+    codigo: str            # código del artículo
+    nombre: str            # descripción
+    precio: float | str = 0
+    barras: str = ""       # contenido del código de barras (si está vacío se usa el código)
+    referencia: str = ""   # línea en negrita bajo el código de barras (opcional)
     copias: int = 1
 
 
 @dataclass
 class Formato:
-    ancho: float          # mm
-    alto: float           # mm
-    margen: float         # mm
-    letra_nombre: float   # alto de letra de la descripción, mm
+    """Medidas en mm. Los elementos van de arriba hacia abajo:
+    logo, código de barras, número del código, referencia, precio (opcional), descripción."""
+    ancho: float
+    alto: float
+    margen: float
+    alto_logo: float
+    alto_barras: float
+    letra_codigo: float
+    letra_ref: float
+    letra_precio: float
+    letra_nombre: float
     lineas_nombre: int
-    letra_precio: float   # mm
-    alto_barras: float    # mm
+    espacio: float = 0.6
 
 
 # Formatos disponibles. Para agregar uno nuevo basta con añadirlo aquí.
 FORMATOS: dict[str, Formato] = {
     "3 x 2,2 cm vertical": Formato(
-        ancho=22, alto=30, margen=1.5,
-        letra_nombre=2.4, lineas_nombre=3,
-        letra_precio=4.5, alto_barras=10,
+        ancho=22, alto=30, margen=1.2,
+        alto_logo=4.5, alto_barras=8, letra_codigo=1.8,
+        letra_ref=2.2, letra_precio=3.2, letra_nombre=2.3, lineas_nombre=4,
     ),
     "5 x 2,5 cm horizontal": Formato(
-        ancho=50, alto=25, margen=2,
-        letra_nombre=2.8, lineas_nombre=2,
-        letra_precio=5, alto_barras=7,
+        ancho=50, alto=25, margen=1.5,
+        alto_logo=3.5, alto_barras=6, letra_codigo=1.8,
+        letra_ref=2.6, letra_precio=3.2, letra_nombre=2.5, lineas_nombre=2, espacio=0.5,
     ),
 }
 
@@ -64,7 +75,7 @@ def modulos_code128(codigo: str) -> int:
         simbolos = len(codigo) // 2 + (len(codigo) % 2) * 2
     else:
         simbolos = len(codigo)
-    return 11 * (simbolos + 2) + 2
+    return 11 * (simbolos + 2) + 13          # + inicio y control (11 c/u) + parada (13)
 
 
 def recortar(texto: str, ancho_puntos: int, letra_puntos: int, lineas: int) -> str:
@@ -74,26 +85,109 @@ def recortar(texto: str, ancho_puntos: int, letra_puntos: int, lineas: int) -> s
     return texto if len(texto) <= maximo else texto[: maximo - 1].rstrip() + "."
 
 
-def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.") -> str:
+# ---------------------------------------------------------------- logo
+
+def ruta_logo(logo: str) -> Path | None:
+    if not logo or not logo.strip():
+        return None
+    ruta = Path(logo.strip())
+    return ruta if ruta.is_absolute() else CARPETA / ruta
+
+
+def logo_zpl(logo: str, max_ancho: int, max_alto: int) -> tuple[str, int, int] | None:
+    """Convierte la imagen del logo en un gráfico ZPL (^GFA). Devuelve (comando, ancho, alto)."""
+    ruta = ruta_logo(logo)
+    if ruta is None:
+        return None
+    if not ruta.exists():
+        raise FileNotFoundError(f"No se encuentra la imagen del logo: {ruta}")
+    return _logo(str(ruta), ruta.stat().st_mtime, max_ancho, max_alto)
+
+
+@lru_cache(maxsize=16)
+def _logo(ruta: str, _mtime: float, max_ancho: int, max_alto: int):
+    try:
+        from PIL import Image, ImageOps
+    except ImportError as e:
+        raise RuntimeError("Para imprimir el logo instale Pillow:  py -m pip install pillow") from e
+
+    im = Image.open(ruta)
+    if im.mode in ("RGBA", "LA", "P"):
+        im = im.convert("RGBA")
+        fondo = Image.new("RGBA", im.size, "white")
+        im = Image.alpha_composite(fondo, im)
+    im = ImageOps.invert(im.convert("L"))           # negro -> 255
+    caja = im.point(lambda v: 255 if v > 60 else 0).getbbox()
+    if caja:
+        im = im.crop(caja)                           # quita el borde blanco
+    escala = min(max_ancho / im.width, max_alto / im.height)
+    tam = (max(1, round(im.width * escala)), max(1, round(im.height * escala)))
+    im = im.resize(tam, Image.LANCZOS)
+    bn = im.point(lambda v: 255 if v >= 110 else 0).convert("1")   # 1 = punto negro
+    datos = bn.tobytes()
+    por_fila = (bn.width + 7) // 8
+    return f"^GFA,{len(datos)},{len(datos)},{por_fila},{datos.hex().upper()}^FS", bn.width, bn.height
+
+
+# ---------------------------------------------------------------- etiqueta
+
+def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
+                logo: str = "", con_precio: bool = False) -> str:
+    f = formato
     pd = dpi / 25.4                                    # puntos por mm
-    ancho, alto = round(formato.ancho * pd), round(formato.alto * pd)
-    m = round(formato.margen * pd)
+
+    def d(mm: float) -> int:
+        return round(mm * pd)
+
+    ancho, alto = d(f.ancho), d(f.alto)
+    m = d(f.margen)
     util = ancho - 2 * m
-    letra_n = round(formato.letra_nombre * pd)
-    letra_p = round(formato.letra_precio * pd)
-    alto_b = round(formato.alto_barras * pd)
+    esp = d(f.espacio)
+    y = m
+    cuerpo = []
 
-    y_nombre = m
-    y_precio = y_nombre + formato.lineas_nombre * letra_n + round(0.8 * pd)
-    y_barras = y_precio + letra_p + round(1.2 * pd)
+    def texto(valor: str, letra: int, lineas: int = 1, ancho_letra: int | None = None):
+        cuerpo.append(f"^FO{m},{y}^A0N,{letra},{ancho_letra or letra}"
+                      f"^FB{util},{lineas},0,C^FH\\^FD{escapar_zpl(valor)}^FS")
 
+    # Logo
+    grafico = logo_zpl(logo, util, d(f.alto_logo))
+    if grafico:
+        cmd, w, h = grafico
+        cuerpo.append(f"^FO{(ancho - w) // 2},{y}{cmd}")
+        y += h + esp
+
+    # Código de barras Code 128 (el número se imprime aparte, debajo)
     barras = (p.barras or p.codigo).strip()
     modulos = modulos_code128(barras)
     ancho_modulo = max(1, min(3, util // modulos))
-    x_barras = max(0, (ancho - modulos * ancho_modulo) // 2)
+    alto_b = d(f.alto_barras)
+    cuerpo.append(f"^BY{ancho_modulo},2,{alto_b}")
+    cuerpo.append(f"^FO{(ancho - modulos * ancho_modulo) // 2},{y}"
+                  f"^BCN,{alto_b},N,N,N,A^FH\\^FD{escapar_zpl(barras)}^FS")
+    y += alto_b + d(0.4)
 
-    nombre = escapar_zpl(recortar(" ".join(p.nombre.split()), util, letra_n, formato.lineas_nombre))
-    precio = escapar_zpl(formatear_precio(p.precio, moneda))
+    letra = d(f.letra_codigo)
+    texto(barras, letra)
+    y += letra + esp
+
+    # Referencia (en negrita)
+    if p.referencia.strip():
+        letra = d(f.letra_ref)
+        texto(p.referencia.strip(), letra)
+        y += letra + esp
+
+    # Precio (opcional)
+    if con_precio:
+        letra = d(f.letra_precio)
+        texto(formatear_precio(p.precio, moneda), letra)
+        y += letra + esp
+
+    # Descripción: las líneas que quepan en lo que queda de etiqueta
+    letra = d(f.letra_nombre)
+    lineas = max(1, min(f.lineas_nombre, (alto - m - y) // letra))
+    nombre = recortar(" ".join(p.nombre.split()), util, letra, lineas)
+    texto(nombre, letra, lineas, round(letra * 0.85))
 
     return "\n".join([
         "^XA",
@@ -101,18 +195,15 @@ def generar_zpl(p: Producto, formato: Formato, dpi: int = 203, moneda: str = "Bs
         f"^PW{ancho}",
         f"^LL{alto}",
         "^LH0,0",
-        f"^FO{m},{y_nombre}^A0N,{letra_n},{letra_n}"
-        f"^FB{util},{formato.lineas_nombre},0,C^FH\\^FD{nombre}^FS",
-        f"^FO{m},{y_precio}^A0N,{letra_p},{letra_p}^FB{util},1,0,C^FH\\^FD{precio}^FS",
-        f"^BY{ancho_modulo},2,{alto_b}",
-        f"^FO{x_barras},{y_barras}^BCN,{alto_b},Y,N,N,A^FH\\^FD{escapar_zpl(barras)}^FS",
+        *cuerpo,
         f"^PQ{max(1, int(p.copias))}",
         "^XZ",
     ]) + "\n"
 
 
-def generar_lote(productos, formato: Formato, dpi: int = 203, moneda: str = "Bs.") -> str:
-    return "".join(generar_zpl(p, formato, dpi, moneda) for p in productos)
+def generar_lote(productos, formato: Formato, dpi: int = 203, moneda: str = "Bs.",
+                 logo: str = "", con_precio: bool = False) -> str:
+    return "".join(generar_zpl(p, formato, dpi, moneda, logo, con_precio) for p in productos)
 
 
 # ---------------------------------------------------------------- envío
