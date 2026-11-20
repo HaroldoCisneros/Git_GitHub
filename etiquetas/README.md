@@ -43,7 +43,8 @@ Si había un `config.ini` de la versión anterior, se convierte a `config.xml` a
   de barras es `co_art`). El botón **Probar conexión** comprueba la conexión y las columnas.
 - **Impresora**, según la conexión:
   - Zebra en red: la IP (puerto 9100).
-  - Instalada en Windows: el nombre de la impresora; con `pywin32` instalado aparece la lista para elegir.
+  - Instalada en Windows (USB): se elige de la lista de impresoras instaladas (↻ la actualiza). Si hay una Zebra
+    (o ZDesigner) se selecciona sola. Para ver la lista desde la consola: `py winprint.py`.
   - Dispositivo / compartida: `\\PC-CAJA\Zebra` o `/dev/usb/lp0`.
   - Archivo `.zpl`: para pruebas.
 

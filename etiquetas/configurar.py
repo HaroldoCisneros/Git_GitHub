@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import config
+import winprint
 import zpl
 from db import Articulos
 
@@ -31,15 +32,6 @@ CAMPOS_SQL = [("servidor", "Servidor"), ("puerto", "Puerto"), ("base_datos", "Ba
 CAMPOS_TABLA = [("nombre", "Tabla"), ("codigo", "Columna código"),
                 ("descripcion", "Columna descripción"), ("precio", "Columna precio"),
                 ("barras", "Columna código de barras")]
-
-
-def impresoras_windows() -> list[str]:
-    try:
-        import win32print
-    except ImportError:
-        return []
-    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    return [p[2] for p in win32print.EnumPrinters(flags)]
 
 
 class Editor(tk.Toplevel):
@@ -118,7 +110,7 @@ class Editor(tk.Toplevel):
         ttk.Label(f, text="Destino:").grid(row=1, column=0, sticky="w", pady=2)
         self.cb_destino = ttk.Combobox(f, textvariable=imp["destino"], width=34)
         self.cb_destino.grid(row=1, column=1, sticky="w", padx=6)
-        self.btn_archivo = ttk.Button(f, text="…", width=3, command=self._elegir_archivo)
+        self.btn_archivo = ttk.Button(f, text="…", width=3, command=self._boton_destino)
         self.btn_archivo.grid(row=1, column=2)
         self.lbl_ayuda = ttk.Label(f, text="", foreground="#666")
         self.lbl_ayuda.grid(row=2, column=1, columnspan=2, sticky="w", padx=6)
@@ -160,8 +152,32 @@ class Editor(tk.Toplevel):
         self.vars["impresora"]["tipo"].set(tipo)
         self.lbl_ayuda.configure(text=AYUDA_DESTINO[tipo])
         self.ent_puerto.configure(state="normal" if tipo == "red" else "disabled")
-        self.btn_archivo.configure(state="normal" if tipo == "archivo" else "disabled")
-        self.cb_destino.configure(values=impresoras_windows() if tipo == "windows" else [])
+        self.btn_archivo.configure(state="normal" if tipo in ("archivo", "windows") else "disabled",
+                                   text="↻" if tipo == "windows" else "…")
+        if tipo == "windows":
+            self._cargar_impresoras()
+        else:
+            self.cb_destino.configure(values=[])
+
+    def _cargar_impresoras(self):
+        """Llena la lista con las impresoras instaladas en Windows."""
+        try:
+            lista = winprint.impresoras()
+        except OSError as e:
+            lista = []
+            self.lbl_ayuda.configure(text=f"No se pudo leer la lista de impresoras: {e}")
+        self.cb_destino.configure(values=lista)
+        destino = self.vars["impresora"]["destino"]
+        if lista and destino.get() not in lista:
+            destino.set(winprint.sugerida(lista))
+        if not lista and winprint.disponible():
+            self.lbl_ayuda.configure(text="No hay impresoras instaladas en Windows")
+
+    def _boton_destino(self):
+        if self._tipo() == "windows":
+            self._cargar_impresoras()
+        else:
+            self._elegir_archivo()
 
     def _elegir_archivo(self):
         ruta = filedialog.asksaveasfilename(parent=self, defaultextension=".zpl",

@@ -130,20 +130,10 @@ def enviar_dispositivo(zpl: str, ruta: str) -> None:
 
 
 def enviar_windows(zpl: str, impresora: str) -> None:
-    """Impresora instalada en Windows (USB), envío RAW. Requiere: pip install pywin32"""
-    import win32print  # importación opcional
+    """Impresora instalada en Windows (USB, compartida...), envío RAW."""
+    import winprint
 
-    h = win32print.OpenPrinter(impresora)
-    try:
-        win32print.StartDocPrinter(h, 1, ("Etiquetas", None, "RAW"))
-        try:
-            win32print.StartPagePrinter(h)
-            win32print.WritePrinter(h, zpl.encode("utf-8"))
-            win32print.EndPagePrinter(h)
-        finally:
-            win32print.EndDocPrinter(h)
-    finally:
-        win32print.ClosePrinter(h)
+    winprint.imprimir_raw(zpl.encode("utf-8"), impresora)
 
 
 def enviar(zpl: str, tipo: str, destino: str, puerto: int = 9100) -> None:
